@@ -19,7 +19,7 @@ An interactive, single-page behavioural digital twin of **RackSentinel**, the RI
 | Inspect the rack | Click the rack (or Tab to **RACK 01** and press Enter) |
 | Press P0 | Click the reset button on the rack's side, or **P0 RESET**. The operator walks over and presses it |
 | Change conditions / send packets | Click the DCIM terminal: sliders use real step sizes (1 V, 0.2 A, 0.5 °C), plus presets, a corrupted-CRC packet and an invalid reading |
-| Scenarios | **Scenarios** panel at the middle right (the room re-centres beside it): 13 scripted, deterministic scenarios, each tagged with the official case it demonstrates. Each one shows the fault, then a simulated **external** recovery (new telemetry from the DCIM), and, when an EPO request is latched, the operator walks over and makes a new P0 press once readings are safe. The prompt bar says what each phase shows |
+| Scenarios | **Scenarios** rail at the middle right: pick a category (Rack, Power, Reset, Comms) and its scenarios slide out beside it, with the room re-centring alongside. 13 scripted, deterministic scenarios, each tagged with the official case it demonstrates. Each one shows the fault, then a simulated **external** recovery (new telemetry from the DCIM), and, when an EPO request is latched, the operator walks over and makes a new P0 press once readings are safe. The prompt bar says what each phase shows |
 | Guided demo | **Guided demo** button in the toolbar or `G`; the step text appears at the middle right. Use `←` / `→` to step through it |
 
 The room renders at three quality levels, chosen in the toolbar and remembered in the browser:

@@ -24,6 +24,17 @@ export const FOCUS: Record<FocusName, CamPose> = {
   observer: frame(100, 12, 40, -4, -8, 3.4),
 };
 
+/**
+ * Framings used while a side panel is docked on the right. The scene area is already narrowed
+ * by the dock, so the inspector offsets above would leave a wide empty gap beside it: the
+ * subject sits slightly right of centre instead, toward the docked panel.
+ */
+const FOCUS_DOCKED: Partial<Record<FocusName, CamPose>> = {
+  rack: frame(100, 12, 40, -24, 0, 1.38),
+  button: frame(121, 13, 32, -18, -14, 1.5),
+  desk: frame(9, 76, 52, -10, 40, 1.2),
+};
+
 /** Logical x of Rack A, used for the brief push-in on a new trip. */
 const RACK_CX = P(100, 12, 40)[0];
 
@@ -31,12 +42,24 @@ export class Camera {
   pose: CamPose = { ...FOCUS.room };
   private target: CamPose = { ...FOCUS.room };
   private punch = 0;
+  private docked = false;
   focus: FocusName = "room";
+
+  private framing(name: FocusName): CamPose {
+    return { ...((this.docked && FOCUS_DOCKED[name]) || FOCUS[name]) };
+  }
 
   setFocus(name: FocusName, instant = false): void {
     this.focus = name;
-    this.target = { ...FOCUS[name] };
+    this.target = this.framing(name);
     if (instant) this.pose = { ...this.target };
+  }
+
+  /** A panel docked on the right (or undocked): re-frame the current subject accordingly. */
+  setDocked(docked: boolean, instant = false): void {
+    if (this.docked === docked) return;
+    this.docked = docked;
+    this.setFocus(this.focus, instant);
   }
 
   /** Brief push-in used once when a new trip latches. */

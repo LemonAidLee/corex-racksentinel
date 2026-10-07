@@ -223,6 +223,7 @@ export class Game {
   setViewInset(px: number): void {
     this.insetTarget = Math.max(0, Math.min(px, this.cssW * 0.5));
     if (this.reducedMotion || this.rt.paused) this.inset = this.insetTarget;
+    this.camera.setDocked(this.insetTarget > 200, this.reducedMotion); // the rail alone does not re-frame
   }
 
   setFocus(name: FocusName, instant = false): void {

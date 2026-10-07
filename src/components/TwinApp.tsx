@@ -9,7 +9,7 @@ import { GameContext, RuntimeContext } from "./context";
 import { Brand, ControlBar, LiveRegion, PrimaryStatus, PromptBar, TelemetrySummary, Toasts } from "./hud/Hud";
 import { QUALITY_LABEL, type Quality } from "@/scene/raster";
 import { readQuality, saveQuality } from "@/lib/quality";
-import { DOCK_WIDTH, DemoBar, ScenarioDrawer, StageMini } from "./hud/ScenarioDrawer";
+import { DEMO_WIDTH, DOCK_GAP, DemoBar, RAIL_WIDTH, SHEET_WIDTH, ScenarioDrawer, StageMini } from "./hud/ScenarioDrawer";
 import { ButtonChip, RackChip, RackHoverCard, RackInspector, TerminalChip } from "./panels/RackPanels";
 import { TerminalPanel } from "./panels/TerminalPanel";
 import { HelpDialog, SceneDescription } from "./panels/HelpDialog";
@@ -263,9 +263,11 @@ export default function TwinApp() {
   // the right dock (scenarios or demo text) is hidden while the rack inspector uses that side
   const dockVisible = !observer && !screenshot && panel !== "rack";
   const dockOpen = dockVisible && (drawer || demoActive);
+  // the scene keeps clear of the rail always, and of the sheet or demo text while they show
+  const dockInset = !dockVisible ? 0 : demoActive ? DEMO_WIDTH + 32 : RAIL_WIDTH + 24 + (drawer ? SHEET_WIDTH + DOCK_GAP : 0);
   useEffect(() => {
-    game?.setViewInset(dockOpen ? DOCK_WIDTH + 32 : 0);
-  }, [game, dockOpen]);
+    game?.setViewInset(dockInset);
+  }, [game, dockInset]);
 
   return (
     <RuntimeContext.Provider value={rt}>
