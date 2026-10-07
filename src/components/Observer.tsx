@@ -4,7 +4,7 @@ import { ScenarioStageLine, StatusSeg, Toasts } from "./hud/Hud";
 import { Readings, OutputRows } from "./panels/RackPanels";
 import { Icon } from "./icons";
 import { conditionInfo, epoInfo, resetInfo } from "@/lib/present";
-import { SCENARIOS } from "@/sim/scenarios";
+import { SCENARIOS, caseLabel } from "@/sim/scenarios";
 import { SCENARIO_META } from "./scenarios/meta";
 import { ScenarioIcon } from "./scenarios/ScenarioIcon";
 
@@ -40,9 +40,10 @@ export function ObserverPanel({ onHelp, onRestart }: { onHelp: () => void; onRes
             const current = snap.scenario?.id === sc.id;
             return (
               <button key={sc.id} role="listitem" className={`obs-scn tone-${m.tone} ${current ? "is-current" : ""}`} onClick={() => rt.playScenario(sc.id)}
-                aria-label={`${sc.name}. ${m.effect}.${current ? " Selected." : ""}`}>
+                aria-label={`${sc.name}. ${caseLabel(sc)}. ${m.effect}.${current ? " Selected." : ""}`}>
                 <ScenarioIcon id={sc.id} />
                 {sc.name}
+                <span className="scn-case">{caseLabel(sc)}</span>
               </button>
             );
           })}

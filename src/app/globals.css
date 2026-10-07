@@ -250,6 +250,9 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
 .scn-value { display: block; margin-top: 2px; font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--tone); }
 .scn-effect { display: block; margin-top: 1px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.35; }
 .scn-playing { font-size: 11px; font-weight: 600; color: var(--accent-interface-strong); margin-left: 6px; }
+/* official test case the scenario demonstrates (neutral: it is a reference, not a state) */
+.scn-case { display: inline-block; margin-top: 4px; padding: 1px 6px; border: 1px solid var(--border-subtle); border-radius: 4px; font-family: var(--font-data); font-size: 11px; font-weight: 500; line-height: 1.5; color: var(--text-secondary); white-space: nowrap; }
+.obs-scn .scn-case { margin-top: 0; font-size: 10.5px; }
 
 /* guided demo */
 .demobar { width: min(740px, 60vw); padding: 14px 18px; }

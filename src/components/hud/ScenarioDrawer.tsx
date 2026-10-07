@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSim } from "../context";
 import { Icon } from "../icons";
-import { SCENARIOS } from "@/sim/scenarios";
+import { SCENARIOS, caseLabel } from "@/sim/scenarios";
 import { DEMO_BEATS } from "@/sim/demo";
 import { CATEGORIES, SCENARIO_META, type CategoryId } from "../scenarios/meta";
 import { ScenarioIcon } from "../scenarios/ScenarioIcon";
@@ -51,7 +51,7 @@ export function ScenarioDrawer({ open, onToggle, onPlay }: { open: boolean; onTo
                 <button
                   key={s.id}
                   className={`scn tone-${m.tone} ${current ? "is-current" : ""}`}
-                  aria-label={`${s.name}. ${m.value}. ${m.effect}.${current ? " Currently selected." : ""}`}
+                  aria-label={`${s.name}. ${caseLabel(s)}. ${m.value}. ${m.effect}.${current ? " Currently selected." : ""}`}
                   title={s.summary}
                   onClick={() => {
                     onPlay(s.id);
@@ -61,6 +61,7 @@ export function ScenarioDrawer({ open, onToggle, onPlay }: { open: boolean; onTo
                   <ScenarioIcon id={s.id} />
                   <span>
                     <span className="scn-name">{s.name}{current && <span className="scn-playing">{scenario?.running ? "Playing" : "Selected"}</span>}</span>
+                    <span className="scn-case">{caseLabel(s)}</span>
                     <span className="scn-value">{m.value}</span>
                     <span className="scn-effect">{m.effect}</span>
                   </span>

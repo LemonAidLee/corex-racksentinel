@@ -1,7 +1,8 @@
 /**
  * Scenario definitions. Every scenario is a deterministic, timed list of steps that starts
  * from a controller power-on reset, like every case in tb_data_center_application.v.
- * `testCase` links each scenario to the evidence; it is not shown to normal users.
+ * `testCase` links each scenario to the official cases (TESTCASES_FINAL_C01-C12.md); the scenario
+ * cards show it so a scenario can be matched to its case.
  * Values are real units; they are converted to raw steps exactly (0.2 A, 0.5 °C).
  *
  * Recovery is always external: RackSentinel only measures the rack and requests outputs.
@@ -127,7 +128,7 @@ export const SCENARIOS: Scenario[] = [
     id: "combined",
     name: "Combined Danger",
     summary: "Heat and overcurrent together. Either fault alone keeps the EPO request.",
-    testCase: "C06",
+    testCase: "C06 · C07",
     steps: [
       { at: 300, type: "conditions", ...N },
       { at: 2500, type: "conditions", amps: 32.2, degC: 32.5 },
@@ -235,6 +236,9 @@ export const SCENARIOS: Scenario[] = [
 ];
 
 export const scenarioById = (id: string) => SCENARIOS.find((s) => s.id === id);
+
+/** Card label for a scenario's case: "Case C03", or "Extra · <doc reference>" when it is not one of C01–C12. */
+export const caseLabel = (s: Scenario) => (/^C\d/.test(s.testCase) ? `Case ${s.testCase}` : `Extra · ${s.testCase}`);
 
 /** Scenarios whose script includes an operator acknowledgement (a latched EPO is expected). */
 export const needsAcknowledge = (s: Scenario) => s.steps.some((x) => x.type === "acknowledge");
