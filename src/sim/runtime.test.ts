@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TEMP_CLASS, type ResetOutcome } from "./controller";
-import { SimulationRuntime, type OperatorAgent } from "./runtime";
+import { ALERT_GAP_MS, SimulationRuntime, type OperatorAgent } from "./runtime";
 import { SCENARIOS, needsAcknowledge, scenarioById } from "./scenarios";
 import { DEMO_BEATS, GuidedDemo } from "./demo";
 
@@ -8,7 +8,7 @@ function run(rt: SimulationRuntime, ms: number, step = 16) {
   for (let t = 0; t < ms; t += step) rt.advance(step);
 }
 
-function play(id: string, ms = 30000) {
+function play(id: string, ms = 45000) {
   const rt = new SimulationRuntime();
   rt.playScenario(id);
   run(rt, ms);
@@ -135,6 +135,20 @@ describe("scenario playback ends in the documented state (headless)", () => {
     });
   }
 
+  it("spaces alerts far enough apart to read", () => {
+    for (const s of SCENARIOS) {
+      const rt = new SimulationRuntime();
+      const shownAt: number[] = [];
+      rt.bus.on("notice", () => shownAt.push(rt.time));
+      rt.playScenario(s.id);
+      run(rt, 45000);
+      expect(shownAt.length, s.id).toBeGreaterThan(0);
+      for (let i = 1; i < shownAt.length; i++) {
+        expect(shownAt[i] - shownAt[i - 1], `${s.id} alert ${i}`).toBeGreaterThanOrEqual(ALERT_GAP_MS);
+      }
+    }
+  });
+
   it("is deterministic", () => {
     for (const s of SCENARIOS) expect(play(s.id).getSnapshot().controller).toEqual(play(s.id).getSnapshot().controller);
   });
@@ -161,14 +175,31 @@ describe("external recovery and operator acknowledgement", () => {
     expect(rt.controller.state.latestTemp).toBe(64); // 32.0 °C: external recovery, still Warm
     expect(rt.controller.state.tempClass).toBe(TEMP_CLASS.WARM);
     expect(rt.controller.state.epo).toBe(true);
-    until(rt, 10600);
+    until(rt, 10400); // part way down the gradual recovery: cooler, but not yet Normal
+    expect(rt.controller.state.latestTemp).toBeGreaterThan(53);
+    expect(rt.controller.state.latestTemp).toBeLessThan(64);
+    until(rt, 14300);
     expect(rt.controller.state.latestTemp).toBe(53); // 26.5 °C safe telemetry
     expect(rt.controller.state.tempClass).toBe(TEMP_CLASS.NORMAL);
   });
 
+  it("Critical Heat cools one 0.5 °C step at a time, never jumping to the safe reading", () => {
+    const rt = new SimulationRuntime();
+    const temps: number[] = [];
+    rt.bus.on("state", (s) => {
+      if (s.gotTemp && temps[temps.length - 1] !== s.latestTemp) temps.push(s.latestTemp);
+    });
+    rt.playScenario("critical-heat");
+    run(rt, 30000);
+    const falls = temps.slice(1).map((t, i) => temps[i] - t).filter((d) => d > 0);
+    expect(falls).toHaveLength(12); // 32.5 °C down to 26.5 °C
+    expect(Math.max(...falls)).toBe(1); // one raw step is 0.5 °C: no jumps
+    expect(temps[temps.length - 1]).toBe(53);
+  });
+
   it("EPO stays latched after safe telemetry until the operator's new P0 press", () => {
     const { rt, w } = withOperator("critical-heat");
-    until(rt, 12400); // safe readings since 10.5 s, dwell not over
+    until(rt, 15900); // safe since 14.2 s, dwell not over
     expect(rt.controller.state.epo).toBe(true);
     expect(rt.getSnapshot().resetBlockers).toEqual([]);
     expect(w.outcomes).toEqual([]);
@@ -182,7 +213,7 @@ describe("external recovery and operator acknowledgement", () => {
   it("the operator is only sent when a reset is appropriate, and never clears the EPO directly", () => {
     for (const id of ACK_IDS) {
       const { rt, op, w } = withOperator(id);
-      run(rt, 32000);
+      run(rt, 48000);
       const auto = op.pressCalls.filter((c) => c.auto);
       expect(auto.length, id).toBe(1);
       for (const c of auto) expect(c, id).toMatchObject({ safe: true, epo: true, held: false });
@@ -216,7 +247,7 @@ describe("external recovery and operator acknowledgement", () => {
     rt.pressReset(false); // a user press while unsafe is refused normally
     expect(rt.getSnapshot().lastReset?.outcome).toBe("current-warning");
     rt.buttonUp();
-    until(rt, 11100);
+    until(rt, 14300);
     expect(rt.controller.state.latestCurrent).toBe(127); // 25.4 A
     expect(rt.controller.state.epo).toBe(true);
     run(rt, 6000);
@@ -226,7 +257,7 @@ describe("external recovery and operator acknowledgement", () => {
 
   it("Reset While Warm: one refused press, then one later accepted press", () => {
     const { rt, op, w } = withOperator("reset-warm");
-    run(rt, 32000);
+    run(rt, 40000);
     expect(w.outcomes.map((o) => o.outcome)).toEqual(["temperature-warm", "accepted"]);
     expect(op.pressCalls.map((c) => c.auto)).toEqual([false, true]);
     expect(w.outcomes[1].at).toBeGreaterThan(12500 + 2000);
@@ -234,26 +265,26 @@ describe("external recovery and operator acknowledgement", () => {
 
   it("Reset During Current Warning: one refused press, then one later accepted press", () => {
     const { rt, op, w } = withOperator("reset-current");
-    run(rt, 32000);
+    run(rt, 40000);
     expect(w.outcomes.map((o) => o.outcome)).toEqual(["current-warning", "accepted"]);
     expect(op.pressCalls.map((c) => c.auto)).toEqual([false, true]);
   });
 
   it("Held Reset Button: safe readings and the hold cannot clear; release, then a new press", () => {
     const { rt, op, w } = withOperator("held-button");
-    until(rt, 9900);
+    until(rt, 11600);
     expect(rt.p0Down).toBe(true);
     expect(rt.controller.state.epo).toBe(true);
     expect(rt.getSnapshot().resetBlockers).toEqual(["held"]);
     expect(op.pressCalls).toEqual([]);
-    until(rt, 10050);
+    until(rt, 14100);
     expect(rt.p0Down).toBe(false); // released by the script, not by a reset
     expect(rt.controller.state.epo).toBe(true);
     run(rt, 10000);
     expect(rt.controller.state.epo).toBe(false);
     const accepted = w.outcomes.filter((o) => o.outcome === "accepted");
     expect(accepted).toHaveLength(1);
-    expect(accepted[0].at).toBeGreaterThanOrEqual(12000);
+    expect(accepted[0].at).toBeGreaterThanOrEqual(15000);
     expect(op.pressCalls).toHaveLength(1);
     expect(op.pressCalls[0]).toMatchObject({ auto: true, held: false });
   });
@@ -266,9 +297,9 @@ describe("external recovery and operator acknowledgement", () => {
     until(rt, 4050);
     expect(rt.getSnapshot().lastFrame).toMatchObject({ kind: "invalid", reply: [0x3c] });
     expect(rt.controller.snapshot()).toEqual(before);
-    until(rt, 8600);
+    until(rt, 12100);
     expect(rt.controller.state).toMatchObject({ epo: true, tempClass: TEMP_CLASS.NORMAL });
-    run(rt, 8000);
+    run(rt, 12000);
     expect(rt.controller.pins).toBe(0);
   });
 
@@ -281,15 +312,15 @@ describe("external recovery and operator acknowledgement", () => {
     expect(rt.getSnapshot().lastFrame).toMatchObject({ kind: "corrupt", reply: [0x5a] });
     expect(rt.controller.snapshot()).toEqual({ ...before, crcRejects: 1 });
     expect(rt.controller.state.epo).toBe(true);
-    until(rt, 8600);
+    until(rt, 12100);
     expect(rt.controller.state).toMatchObject({ epo: true, tempClass: TEMP_CLASS.NORMAL, latestTemp: 53 });
-    run(rt, 8000);
+    run(rt, 12000);
     expect(rt.controller.pins).toBe(0);
   });
 
   it("No Telemetry: the link stays silent and P0 still resets locally", () => {
     const { rt, w } = withOperator("no-telemetry");
-    until(rt, 5600);
+    until(rt, 11600);
     const at = rt.lastSampleAt;
     expect(rt.streaming).toBe(false);
     run(rt, 20000);
@@ -304,7 +335,7 @@ describe("external recovery and operator acknowledgement", () => {
 describe("cancellation and manual interaction", () => {
   it("starting a new scenario cancels a pending automatic reset", () => {
     const { rt, op, w } = withOperator("critical-heat", 3000);
-    until(rt, 13000); // operator dispatched at 12.5 s and still walking
+    until(rt, 16400); // operator dispatched at 16.2 s and still walking
     expect(rt.recovery.phase).toBe("dispatched");
     expect(op.busy).toBe(true);
     rt.playScenario("normal");
@@ -335,7 +366,7 @@ describe("cancellation and manual interaction", () => {
 
   it("restart during the operator's press lets go of P0", () => {
     const { rt, op } = withOperator("critical-heat", 400);
-    until(rt, 12500 + 400 + 100); // finger on the button
+    until(rt, 16200 + 400 + 150); // finger on the button
     expect(op.presses).toBe(1);
     rt.restart();
     expect(rt.p0Down).toBe(false);
@@ -345,7 +376,7 @@ describe("cancellation and manual interaction", () => {
 
   it("a manual reset during the safe dwell means the operator is never sent", () => {
     const { rt, op, w } = withOperator("critical-heat");
-    until(rt, 11000);
+    until(rt, 15000); // readings are safe, the operator has not been sent yet
     rt.pressReset(false); // the user presses P0 first
     expect(rt.controller.state.epo).toBe(false);
     run(rt, 20000);
@@ -356,7 +387,7 @@ describe("cancellation and manual interaction", () => {
 
   it("a manual reset while the operator is on the way calls the operator off", () => {
     const { rt, op, w } = withOperator("critical-heat", 3000);
-    until(rt, 13000);
+    until(rt, 16400);
     expect(rt.recovery.phase).toBe("dispatched");
     rt.pressReset(false);
     expect(rt.controller.state.epo).toBe(false);

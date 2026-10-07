@@ -11,6 +11,7 @@
  * A latched EPO request is cleared only by the operator's new P0 press (`acknowledge`).
  */
 import type { NoticeTone } from "./events";
+import { ampsToRaw, degCToRaw, rawToAmps, rawToDegC } from "./units";
 
 export interface Conditions {
   volts: number;
@@ -42,7 +43,8 @@ export type ScenarioStep =
   /**
    * Recovery phase: once the controller reports safe readings with the EPO still latched, wait
    * `dwell` ms so the latch is visible, then send the operator to make a new P0 press.
-   * The operator only goes when a reset is logically appropriate (see RecoveryCoordinator).
+   * Arming early is safe: the operator is only sent once the conditions actually allow a reset,
+   * so an `acknowledge` placed at the start of a gradual recovery waits for it to finish.
    */
   | { at: number; type: "acknowledge"; dwell?: number };
 
@@ -56,6 +58,36 @@ export interface Scenario {
 
 const N = { amps: 25.4, degC: 26.5 }; // Normal reading used by the test cases
 
+/** A reading the simulated rack can report. */
+type Reading = { amps: number; degC: number };
+
+/** How long a gradual recovery takes, however many protocol steps it spans. */
+const RAMP_MS = 6000;
+
+/** Protocol steps between two readings; one step is 0.2 A or 0.5 °C. */
+const stepsBetween = (from: Reading, to: Reading) =>
+  Math.max(Math.abs(ampsToRaw(to.amps) - ampsToRaw(from.amps)), Math.abs(degCToRaw(to.degC) - degCToRaw(from.degC)));
+
+/**
+ * A gradual external recovery: the rack walks from `from` to `to` one protocol step at a time,
+ * each step sent as its own DCIM sample, so the reading is seen falling instead of jumping.
+ * The final step carries `to` exactly and always lands at `startAt + totalMs`.
+ */
+function ramp(startAt: number, from: Reading, to: Reading, totalMs = RAMP_MS): ScenarioStep[] {
+  const n = stepsBetween(from, to);
+  if (n === 0) return [];
+  let a = ampsToRaw(from.amps);
+  let t = degCToRaw(from.degC);
+  const aTo = ampsToRaw(to.amps);
+  const tTo = degCToRaw(to.degC);
+  const out: ScenarioStep[] = [];
+  for (let i = 1; i <= n; i++) {
+    a += Math.sign(aTo - a);
+    t += Math.sign(tTo - t);
+    out.push({ at: Math.round(startAt + (i * totalMs) / n), type: "recover", amps: rawToAmps(a), degC: rawToDegC(t) });
+  }
+  return out;
+}
 
 export const SCENARIOS: Scenario[] = [
   {
@@ -80,20 +112,20 @@ export const SCENARIOS: Scenario[] = [
       { at: 6500, type: "conditions", amps: 25.4, degC: 32.0 },
       { at: 6600, type: "stage", title: "Exactly 32.0 °C is still Warm", detail: "Fan boost only. Critical starts at 32.5 °C.", tone: "warn" },
       { at: 7200, type: "note", title: "Exactly 32.0 °C is still Warm", detail: "Fan boost only. No EPO request below 32.5 °C.", tone: "info" },
-      { at: 11000, type: "recover", ...N },
+      ...ramp(9000, { amps: 25.4, degC: 32.0 }, N),
     ],
   },
   {
     id: "critical-heat",
     name: "Critical Heat",
-    summary: "32.5 °C is Critical: maximum fans and an EPO request. External recovery, then the operator acknowledges.",
+    summary: "32.5 °C is Critical: maximum fans and an EPO request. The rack cools 0.5 °C at a time, then the operator acknowledges.",
     testCase: "C03",
     steps: [
       { at: 300, type: "conditions", ...N },
       { at: 3000, type: "conditions", amps: 25.4, degC: 32.5 },
       { at: 7000, type: "recover", amps: 25.4, degC: 32.0 },
-      { at: 10500, type: "recover", ...N },
-      { at: 10500, type: "acknowledge" },
+      ...ramp(8200, { amps: 25.4, degC: 32.0 }, N),
+      { at: 8200, type: "acknowledge" },
     ],
   },
   {
@@ -108,7 +140,7 @@ export const SCENARIOS: Scenario[] = [
       { at: 6500, type: "conditions", amps: 32.0, degC: 25.0 },
       { at: 6600, type: "stage", title: "Exactly 32.0 A is still a warning", detail: "Only current above 32.0 A requests EPO.", tone: "warn" },
       { at: 7200, type: "note", title: "Exactly 32.0 A is still a warning", detail: "Only current above 32.0 A requests EPO.", tone: "info" },
-      { at: 11000, type: "recover", amps: 25.4, degC: 25.0 },
+      ...ramp(9000, { amps: 32.0, degC: 25.0 }, { amps: 25.4, degC: 25.0 }),
     ],
   },
   {
@@ -120,8 +152,8 @@ export const SCENARIOS: Scenario[] = [
       { at: 300, type: "conditions", amps: 25.4, degC: 25.0 },
       { at: 3000, type: "conditions", amps: 32.2, degC: 25.0 },
       { at: 7000, type: "recover", amps: 32.0, degC: 25.0 },
-      { at: 11000, type: "recover", amps: 25.4, degC: 25.0 },
-      { at: 11000, type: "acknowledge" },
+      ...ramp(8200, { amps: 32.0, degC: 25.0 }, { amps: 25.4, degC: 25.0 }),
+      { at: 8200, type: "acknowledge" },
     ],
   },
   {
@@ -133,11 +165,11 @@ export const SCENARIOS: Scenario[] = [
       { at: 300, type: "conditions", ...N },
       { at: 2500, type: "conditions", amps: 32.2, degC: 32.5 },
       { at: 2600, type: "stage", title: "Critical heat and current trip", detail: "Either fault alone is enough to latch P7.", tone: "alarm" },
-      { at: 6500, type: "recover", amps: 32.2, degC: 25.0 },
-      { at: 7200, type: "stage", title: "Temperature recovered, current still trips", detail: "The current fault alone keeps the EPO request. No reset yet.", tone: "alarm" },
-      { at: 7400, type: "note", title: "Either fault alone is enough", detail: "The EPO request stayed latched through the change.", tone: "info" },
-      { at: 11000, type: "recover", amps: 25.4, degC: 25.0 },
-      { at: 11000, type: "acknowledge" },
+      ...ramp(6500, { amps: 32.2, degC: 32.5 }, { amps: 32.2, degC: 25.0 }),
+      { at: 13200, type: "stage", title: "Temperature recovered, current still trips", detail: "The current fault alone keeps the EPO request. No reset yet.", tone: "alarm" },
+      { at: 13400, type: "note", title: "Either fault alone is enough", detail: "The EPO request stayed latched through the change.", tone: "info" },
+      ...ramp(14500, { amps: 32.2, degC: 25.0 }, { amps: 25.4, degC: 25.0 }),
+      { at: 14500, type: "acknowledge" },
     ],
   },
   {
@@ -148,9 +180,9 @@ export const SCENARIOS: Scenario[] = [
     steps: [
       { at: 300, type: "conditions", amps: 25.4, degC: 32.5 },
       { at: 4500, type: "recover", amps: 25.4, degC: 32.0 },
-      { at: 8500, type: "recover", ...N },
-      { at: 10500, type: "note", title: "Safe readings alone did not clear it", detail: "P7 is still latched. Only a new P0 press can acknowledge recovery.", tone: "warn" },
-      { at: 8500, type: "acknowledge", dwell: 3500 },
+      ...ramp(5700, { amps: 25.4, degC: 32.0 }, N),
+      { at: 5700, type: "acknowledge", dwell: 3500 },
+      { at: 13000, type: "note", title: "Safe readings alone did not clear it", detail: "P7 is still latched. Only a new P0 press can acknowledge recovery.", tone: "warn" },
     ],
   },
   {
@@ -160,10 +192,10 @@ export const SCENARIOS: Scenario[] = [
     testCase: "C11",
     steps: [
       { at: 300, type: "conditions", amps: 25.4, degC: 32.5 },
-      { at: 4000, type: "recover", amps: 25.4, degC: 27.0 },
-      { at: 5000, type: "press" },
-      { at: 12500, type: "recover", ...N },
-      { at: 12500, type: "acknowledge" },
+      ...ramp(4000, { amps: 25.4, degC: 32.5 }, { amps: 25.4, degC: 27.0 }),
+      { at: 11000, type: "press" },
+      { at: 13000, type: "recover", ...N },
+      { at: 13000, type: "acknowledge" },
     ],
   },
   {
@@ -173,10 +205,10 @@ export const SCENARIOS: Scenario[] = [
     testCase: "C09",
     steps: [
       { at: 300, type: "conditions", amps: 32.2, degC: 25.0 },
-      { at: 4000, type: "recover", amps: 25.6, degC: 25.0 },
-      { at: 5000, type: "press" },
-      { at: 12500, type: "recover", amps: 25.4, degC: 25.0 },
-      { at: 12500, type: "acknowledge" },
+      ...ramp(4000, { amps: 32.2, degC: 25.0 }, { amps: 25.6, degC: 25.0 }),
+      { at: 11000, type: "press" },
+      { at: 13000, type: "recover", amps: 25.4, degC: 25.0 },
+      { at: 13000, type: "acknowledge" },
     ],
   },
   {
@@ -188,10 +220,10 @@ export const SCENARIOS: Scenario[] = [
       { at: 100, type: "hold" },
       { at: 1500, type: "conditions", amps: 32.2, degC: 25.0 },
       { at: 1600, type: "stage", title: "Trip while P0 is held down", detail: "The held button is not a new press.", tone: "alarm" },
-      { at: 5500, type: "recover", amps: 25.4, degC: 25.0 },
-      { at: 6200, type: "stage", title: "Safe readings, but P0 is still held", detail: "A held button cannot clear the EPO request.", tone: "warn" },
-      { at: 10000, type: "release" },
-      { at: 11500, type: "acknowledge", dwell: 1500 },
+      ...ramp(5500, { amps: 32.2, degC: 25.0 }, { amps: 25.4, degC: 25.0 }),
+      { at: 12200, type: "stage", title: "Safe readings, but P0 is still held", detail: "A held button cannot clear the EPO request.", tone: "warn" },
+      { at: 14000, type: "release" },
+      { at: 14000, type: "acknowledge", dwell: 1500 },
     ],
   },
   {
@@ -203,8 +235,8 @@ export const SCENARIOS: Scenario[] = [
       { at: 300, type: "conditions", amps: 25.4, degC: 32.5 },
       { at: 4000, type: "invalid" },
       { at: 4100, type: "stage", title: "Invalid reading rejected (0x3C)", detail: "Readings, outputs and the EPO latch are unchanged.", tone: "warn" },
-      { at: 8500, type: "recover", ...N },
-      { at: 8500, type: "acknowledge" },
+      ...ramp(6000, { amps: 25.4, degC: 32.5 }, N),
+      { at: 6000, type: "acknowledge" },
     ],
   },
   {
@@ -216,8 +248,8 @@ export const SCENARIOS: Scenario[] = [
       { at: 300, type: "conditions", amps: 25.4, degC: 32.5 },
       { at: 4000, type: "corrupt", ...N },
       { at: 4100, type: "stage", title: "Corrupted message rejected (0x5A)", detail: "The safe-looking packet changed nothing. EPO stays latched.", tone: "warn" },
-      { at: 8500, type: "recover", ...N },
-      { at: 8500, type: "acknowledge" },
+      ...ramp(6000, { amps: 25.4, degC: 32.5 }, N),
+      { at: 6000, type: "acknowledge" },
     ],
   },
   {
@@ -227,10 +259,10 @@ export const SCENARIOS: Scenario[] = [
     testCase: "§16 Q&A",
     steps: [
       { at: 300, type: "conditions", amps: 25.4, degC: 32.5 },
-      { at: 4000, type: "recover", ...N },
-      { at: 5500, type: "stream", on: false },
-      { at: 5600, type: "stage", title: "Link silent · last state held", detail: "No new telemetry. P0 still works locally.", tone: "warn" },
-      { at: 5600, type: "acknowledge", dwell: 2500 },
+      ...ramp(4000, { amps: 25.4, degC: 32.5 }, N),
+      { at: 11500, type: "stream", on: false },
+      { at: 11600, type: "stage", title: "Link silent · last state held", detail: "No new telemetry. P0 still works locally.", tone: "warn" },
+      { at: 11600, type: "acknowledge", dwell: 2500 },
     ],
   },
 ];

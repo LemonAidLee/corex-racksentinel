@@ -57,6 +57,8 @@ export const STREAM_PERIOD_MS = 3000;
 export const PRESS_HOLD_MS = 280;
 /** Time after the last scripted step before a scenario with nothing pending is complete. */
 export const SCENARIO_TAIL_MS = 1500;
+/** Minimum spacing between alerts reaching the HUD, so a burst stays readable. */
+export const ALERT_GAP_MS = 1200;
 /** How long the "Scenario complete" line stays in the prompt bar. */
 const COMPLETE_STAGE_MS = 7000;
 
@@ -94,6 +96,8 @@ export class SimulationRuntime {
   private lastReset: SimSnapshot["lastReset"] = null;
   private notices: Notice[] = [];
   private noticeSeq = 0;
+  /** Simulation time the next alert may appear (see notify). */
+  private nextNoticeAt = 0;
   private quiet = 0;
   private listeners = new Set<() => void>();
   private snap: SimSnapshot;
@@ -201,6 +205,7 @@ export class SimulationRuntime {
     this.lastReset = null;
     if (!opts.keepScenario) this.scenario = null;
     this.notices = [];
+    this.nextNoticeAt = 0;
     this.bus.emit("restart", {});
     this.bus.emit("state", this.controller.snapshot());
     this.changed();
@@ -491,11 +496,27 @@ export class SimulationRuntime {
   }
 
   // ---------------------------------------------------------------- notices
+  /**
+   * Raise an alert. A single sample can raise several at once (a class change, then "conditions
+   * are now safe", then the reset prompt); they are released at least ALERT_GAP_MS apart on the
+   * simulation clock so each is readable and a burst does not flash past. `at` stays the moment
+   * the event happened, so the log timestamps stay truthful.
+   */
   notify(title: string, detail: string | undefined, tone: NoticeTone): void {
     if (this.quiet) return;
-    const n: Notice = { id: ++this.noticeSeq, title, detail, tone, at: this.time };
-    this.notices = [...this.notices.slice(-3), n];
+    const at = this.time;
+    const due = Math.max(this.time, this.nextNoticeAt);
+    this.nextNoticeAt = due + ALERT_GAP_MS;
+    if (due === this.time) this.pushNotice(title, detail, tone, at);
+    else this.schedule(due - this.time, () => this.pushNotice(title, detail, tone, at));
+  }
+
+  private pushNotice(title: string, detail: string | undefined, tone: NoticeTone, at: number): void {
+    const n: Notice = { id: ++this.noticeSeq, title, detail, tone, at };
+    // kept deeper than the HUD shows, so a queued alert is never dropped before it appears
+    this.notices = [...this.notices.slice(-9), n];
     this.bus.emit("notice", n);
+    this.changed();
   }
 
   dismissNotice(id: number): void {

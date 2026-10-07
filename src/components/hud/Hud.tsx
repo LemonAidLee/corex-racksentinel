@@ -199,10 +199,13 @@ const TOAST_LOOK: Record<NoticeTone, { tone: Tone; icon: IconName }> = {
   info: { tone: "neutral", icon: "info" },
 };
 
+/** How long an alert stays on screen once it appears. Alarms linger longest. */
+const TOAST_MS: Record<NoticeTone, number> = { alarm: 14000, warn: 12000, ok: 10000, info: 10000 };
+
 function ToastItem({ n }: { n: Notice }) {
   const rt = useRuntime();
   useEffect(() => {
-    const id = setTimeout(() => rt.dismissNotice(n.id), n.tone === "alarm" ? 9000 : 6500);
+    const id = setTimeout(() => rt.dismissNotice(n.id), TOAST_MS[n.tone]);
     return () => clearTimeout(id);
   }, [rt, n]);
   const look = TOAST_LOOK[n.tone];
@@ -220,6 +223,7 @@ function ToastItem({ n }: { n: Notice }) {
   );
 }
 
+/** The runtime spaces alerts out on the simulation clock (ALERT_GAP_MS), so this just shows them. */
 export function Toasts({ max = 3 }: { max?: number }) {
   const { notices } = useSim();
   return (
