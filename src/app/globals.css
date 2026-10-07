@@ -142,6 +142,11 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
 .hud > * { pointer-events: auto; }
 .hud-tl { top: var(--gutter); left: var(--gutter); }
 .hud-tc { top: var(--gutter); left: 50%; transform: translateX(-50%); }
+/* the status only fits centred between brand and toolbar on wide viewports; below that it sits
+   after the brand (1920 × 1080 at 125 % Windows scaling is about 1536 CSS px wide) */
+@media (max-width: 1840px) {
+  .hud-tc { left: 272px; transform: none; }
+}
 .hud-tr { top: var(--gutter); right: var(--gutter); }
 .hud-bl { bottom: var(--gutter); left: var(--gutter); max-width: min(420px, 30vw); }
 .hud-bc { bottom: var(--gutter); left: 50%; transform: translateX(-50%); display: flex; justify-content: center; }
@@ -372,8 +377,13 @@ kbd { font-family: var(--font-data); font-size: 12px; padding: 2px 6px; border: 
   .controls .btn-label { display: none; }
   .hud-tc { left: 272px; transform: none; }
 }
-@media (max-width: 1180px) {
+/* below ~1400 CSS px (1366 × 768, or 1920 × 1080 at 150 % scaling) the status cannot sit beside
+   the toolbar in its widest state (alarm labels + Paused): give it its own row under the brand */
+@media (max-width: 1400px) {
   .hud-tc { top: 86px; left: var(--gutter); }
+  .hud-toasts { top: 172px; }
+}
+@media (max-width: 1180px) {
   .hud-toasts { top: 160px; }
   .hud-bl { display: none; }
   .status-sub { display: none; }
