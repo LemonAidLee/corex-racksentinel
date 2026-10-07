@@ -45,7 +45,7 @@ export function Brand({ onHelp }: { onHelp: () => void }) {
 export function StatusSeg({ cap, info, alarm }: { cap: string; info: StateInfo; alarm?: boolean }) {
   return (
     <div className={`status-seg tone-${info.tone} ${alarm ? "is-alarm" : ""}`}>
-      <Icon name={info.icon} size={22} weight="bold" />
+      <span className="status-icon"><Icon name={info.icon} size={18} weight="bold" /></span>
       <div>
         <div className="status-cap">{cap}</div>
         <div className="status-val">{info.label}</div>
@@ -96,13 +96,14 @@ export function ControlBar(p: {
           <option key={q} value={q}>{QUALITY_LABEL[q]}</option>
         ))}
       </select>
-      <span className="sep" aria-hidden="true" />
-      <CtlButton icon={p.paused ? "play" : "pause"} label={p.paused ? "Resume simulation" : "Pause simulation"} onClick={p.onPause} pressed={p.paused} shortcut="Space" />
-      <CtlButton icon={p.muted ? "mute" : "sound"} label={p.muted ? "Unmute sound" : "Mute sound"} onClick={p.onMute} pressed={p.muted} shortcut="M" />
-      <CtlButton icon="motion" label="Reduced motion" onClick={p.onMotion} pressed={p.reducedMotion} />
-      <CtlButton icon="screenshot" label="Screenshot mode" onClick={p.onScreenshot} shortcut="H" />
-      <CtlButton icon={p.fullscreen ? "exitFull" : "full"} label={p.fullscreen ? "Exit fullscreen" : "Fullscreen"} onClick={p.onFullscreen} shortcut="F" />
-      <CtlButton icon="restart" label="Restart simulation" onClick={p.onReset} shortcut="R" />
+      <div className="toolgroup" role="group" aria-label="Simulation and view">
+        <CtlButton icon={p.paused ? "play" : "pause"} label={p.paused ? "Resume simulation" : "Pause simulation"} onClick={p.onPause} pressed={p.paused} shortcut="Space" />
+        <CtlButton icon={p.muted ? "mute" : "sound"} label={p.muted ? "Unmute sound" : "Mute sound"} onClick={p.onMute} pressed={p.muted} shortcut="M" />
+        <CtlButton icon="motion" label="Reduced motion" onClick={p.onMotion} pressed={p.reducedMotion} />
+        <CtlButton icon="screenshot" label="Screenshot mode" onClick={p.onScreenshot} shortcut="H" />
+        <CtlButton icon={p.fullscreen ? "exitFull" : "full"} label={p.fullscreen ? "Exit fullscreen" : "Fullscreen"} onClick={p.onFullscreen} shortcut="F" />
+        <CtlButton icon="restart" label="Restart simulation" onClick={p.onReset} shortcut="R" />
+      </div>
     </div>
   );
 }
@@ -116,7 +117,7 @@ export function ScenarioStageLine({ compact = false }: { compact?: boolean }) {
   if (!scenario || !stage) return null;
   return (
     <div className={`stage-line tone-${STAGE_TONE[stage.tone]} ${compact ? "is-compact" : ""}`}>
-      <span className="eyebrow">{scenario.running ? "Scenario" : "Scenario finished"} · {scenario.name}</span>
+      <span className="eyebrow"><i className="dot" aria-hidden="true" />{scenario.running ? "Scenario" : "Scenario finished"} · {scenario.name}</span>
       <span className="stage-title">{stage.title}</span>
       {stage.detail && <span className="stage-detail">{stage.detail}</span>}
     </div>
@@ -146,7 +147,7 @@ export function PromptBar({ hover }: { hover: string | null }) {
   else text = "Monitoring. Inspect the rack, change conditions at the terminal, or run a scenario.";
   return (
     <div className={`prompt panel tone-${tone}`} aria-hidden="true">
-      <span className="eyebrow">Next action</span>
+      <span className="eyebrow"><i className="dot" aria-hidden="true" />Next action</span>
       <span className="prompt-text">{text}</span>
       <span className="prompt-note">Simulation only · not connected to a physical rack or FPGA</span>
     </div>
@@ -208,7 +209,7 @@ function ToastItem({ n }: { n: Notice }) {
   const isEpo = n.tone === "alarm" && n.title.startsWith("EPO request latched");
   return (
     <li className={`toast tone-${look.tone} ${isEpo ? "is-epo" : ""}`}>
-      <Icon name={look.icon} size={20} weight="bold" />
+      <span className="toast-icon"><Icon name={look.icon} size={16} weight="bold" /></span>
       <div>
         <div className="toast-title">{n.title}</div>
         {n.detail && <div className="toast-detail">{n.detail}</div>}

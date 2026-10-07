@@ -9,7 +9,7 @@ import { GameContext, RuntimeContext } from "./context";
 import { Brand, ControlBar, LiveRegion, PrimaryStatus, PromptBar, TelemetrySummary, Toasts } from "./hud/Hud";
 import { QUALITY_LABEL, type Quality } from "@/scene/raster";
 import { readQuality, saveQuality } from "@/lib/quality";
-import { DemoBar, ScenarioDrawer } from "./hud/ScenarioDrawer";
+import { DOCK_WIDTH, DemoBar, ScenarioDrawer, StageMini } from "./hud/ScenarioDrawer";
 import { ButtonChip, RackChip, RackHoverCard, RackInspector, TerminalChip } from "./panels/RackPanels";
 import { TerminalPanel } from "./panels/TerminalPanel";
 import { HelpDialog, SceneDescription } from "./panels/HelpDialog";
@@ -65,10 +65,12 @@ export default function TwinApp() {
       const g = state.current.game;
       soundRef.current?.unlock();
       if (target === "rack") {
+        setDrawer(false);
         setPanel("rack");
         g?.setFocus("rack");
         if (!state.current.observer) g?.operator.goInspect();
       } else if (target === "terminal") {
+        setDrawer(false);
         setPanel("terminal");
         g?.setFocus("desk");
         if (!state.current.observer) g?.operator.goToDesk();
@@ -169,6 +171,7 @@ export default function TwinApp() {
   const playScenario = useCallback(
     (id: string) => {
       setDemoIndex(-1);
+      setDrawer(false);
       rt.setPaused(false);
       rt.playScenario(id);
     },
@@ -257,6 +260,12 @@ export default function TwinApp() {
   };
   const ringOff = () => game?.setFocusRing(null);
   const demoActive = demoIndex >= 0;
+  // the right dock (scenarios or demo text) is hidden while the rack inspector uses that side
+  const dockVisible = !observer && !screenshot && panel !== "rack";
+  const dockOpen = dockVisible && (drawer || demoActive);
+  useEffect(() => {
+    game?.setViewInset(dockOpen ? DOCK_WIDTH + 32 : 0);
+  }, [game, dockOpen]);
 
   return (
     <RuntimeContext.Provider value={rt}>
@@ -314,13 +323,16 @@ export default function TwinApp() {
                 />
               </div>
               {panel !== "terminal" && <div className="hud hud-bl"><PromptBar hover={hover} /></div>}
-              <div className="hud hud-bc">
-                {demoActive ? (
-                  <DemoBar index={demoIndex} onPrev={demoPrev} onNext={demoNext} onExit={exitDemo} />
-                ) : (
-                  <ScenarioDrawer open={drawer} onToggle={setDrawer} onPlay={playScenario} />
-                )}
-              </div>
+              {dockVisible && (
+                <div className={`hud hud-dock ${dockOpen ? "is-open" : ""}`}>
+                  {demoActive ? (
+                    <DemoBar index={demoIndex} onPrev={demoPrev} onNext={demoNext} onExit={exitDemo} />
+                  ) : (
+                    <ScenarioDrawer open={drawer} onToggle={setDrawer} onPlay={playScenario} />
+                  )}
+                </div>
+              )}
+              <div className="hud hud-bc"><StageMini /></div>
               {panel !== "rack" && <div className="hud hud-br"><TelemetrySummary /></div>}
               {screenshot && (
                 <button className="btn screenshot-exit" onClick={() => setScreenshot(false)}>Show controls (H)</button>

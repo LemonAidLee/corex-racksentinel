@@ -84,6 +84,9 @@ export class Game {
   private focusRing: number = OBJ.NONE;
   private anchors = new Map<HTMLElement, AnchorReg>();
   private cssW = 1;
+  /** CSS px on the right covered by a docked HUD panel; the scene centres in the rest. */
+  private inset = 0;
+  private insetTarget = 0;
   private cssH = 1;
   private dpr = 1;
   private view = { cx: 0, cy: 0, scale: 1 };
@@ -216,6 +219,12 @@ export class Game {
     this.allocate();
   }
 
+  /** Reserve `px` CSS pixels on the right for a docked panel; the scene re-centres in the rest. */
+  setViewInset(px: number): void {
+    this.insetTarget = Math.max(0, Math.min(px, this.cssW * 0.5));
+    if (this.reducedMotion || this.rt.paused) this.inset = this.insetTarget;
+  }
+
   setFocus(name: FocusName, instant = false): void {
     this.returnToRoomAt = -1;
     if (this.observer) name = "observer";
@@ -257,7 +266,7 @@ export class Game {
     const [x, y, z] = ANCHORS[at];
     const [lx, ly] = this.work.projectLogical(x, y, z);
     const { cx, cy, scale } = this.view;
-    return [this.cssW / 2 + (lx - cx) * scale, this.cssH / 2 + (ly - cy) * scale];
+    return [this.viewW / 2 + (lx - cx) * scale, this.cssH / 2 + (ly - cy) * scale];
   }
 
   // ---------------------------------------------------------------- input
@@ -265,7 +274,7 @@ export class Game {
     const rect = this.canvas.getBoundingClientRect();
     const { cx, cy, scale } = this.view;
     const S = this.work.S, W = this.work.w, H = this.work.h;
-    const bx = Math.floor((cx + (e.clientX - rect.left - this.cssW / 2) / scale) * S);
+    const bx = Math.floor((cx + (e.clientX - rect.left - this.viewW / 2) / scale) * S);
     const by = Math.floor((cy + (e.clientY - rect.top - this.cssH / 2) / scale) * S);
     if (bx < 0 || by < 0 || bx >= W || by >= H) return OBJ.NONE;
     const id = this.work.id[by * W + bx];
@@ -328,6 +337,11 @@ export class Game {
     if (!paused) {
       this.rt.advance(dt * 1000);
       this.time += dt;
+      // ease the scene toward its new centre when a side panel docks or undocks
+      if (this.inset !== this.insetTarget) {
+        this.inset += (this.insetTarget - this.inset) * (this.reducedMotion ? 1 : 1 - Math.exp(-dt * 10));
+        if (Math.abs(this.insetTarget - this.inset) < 0.5) this.inset = this.insetTarget;
+      }
       this.operator.update(dt);
       if (this.returnToRoomAt > 0 && this.time >= this.returnToRoomAt && !this.operator.busy) {
         this.returnToRoomAt = -1;
@@ -475,11 +489,16 @@ export class Game {
     }
   }
 
+  /** Width of the visible scene area (the canvas minus a docked panel on the right). */
+  private get viewW(): number {
+    return Math.max(1, this.cssW - this.inset);
+  }
+
   private present(cx: number, cy: number, zoom: number): void {
     this.offCtx.putImageData(this.image, 0, 0);
-    const fit = Math.min(this.cssW / LOGICAL_W, this.cssH / LOGICAL_H);
+    const fit = Math.min(this.viewW / LOGICAL_W, this.cssH / LOGICAL_H);
     // portrait screens (tablets) would leave the room tiny: frame it tighter
-    const portrait = !this.observer && this.cssH > this.cssW ? 1.32 : 1;
+    const portrait = !this.observer && this.cssH > this.viewW ? 1.32 : 1;
     const scale = fit * zoom * portrait; // CSS px per logical px
     this.view = { cx, cy, scale };
 
@@ -490,7 +509,7 @@ export class Game {
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     const s = scale * d;
     // snap the destination origin to device pixels to avoid shimmering seams
-    const dx = Math.round(this.canvas.width / 2 - cx * s);
+    const dx = Math.round((this.viewW * d) / 2 - cx * s);
     const dy = Math.round(this.canvas.height / 2 - cy * s);
     ctx.drawImage(this.off, dx, dy, Math.round(LOGICAL_W * s), Math.round(LOGICAL_H * s));
     // printed lettering on the door mat and team plaque, at screen resolution
@@ -509,7 +528,7 @@ export class Game {
       else { left = x - w / 2; top = y + a.gap; }
       const m = 12;
       const topSafe = 92, bottomSafe = 64;
-      left = Math.max(m, Math.min(this.cssW - w - m, left));
+      left = Math.max(m, Math.min(this.viewW - w - m, left));
       top = Math.max(topSafe, Math.min(this.cssH - h - bottomSafe, top));
     }
     el.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
