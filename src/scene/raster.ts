@@ -210,8 +210,11 @@ export class Raster {
     }
   }
 
-  /** Additive, hard-banded light pool centred on a raster point (no smooth gradients). */
-  lightPool(cx: number, cy: number, rx: number, ry: number, rgb: number, strength: number, bands = 3): void {
+  /**
+   * Additive, hard-banded light pool centred on a raster point (no smooth gradients).
+   * With `onlyId`, light falls only on pixels of that object (rack-edge light, metal glints).
+   */
+  lightPool(cx: number, cy: number, rx: number, ry: number, rgb: number, strength: number, bands = 3, onlyId = -1): void {
     if (strength <= 0) return;
     const r = (rgb >> 16) & 255, g = (rgb >> 8) & 255, b = rgb & 255;
     const xMin = Math.max(0, Math.floor(cx - rx)), xMax = Math.min(this.w - 1, Math.ceil(cx + rx));
@@ -222,8 +225,9 @@ export class Raster {
         const dx = (x + 0.5 - cx) / rx;
         const dist = dx * dx + dy * dy;
         if (dist >= 1) continue;
-        const k = (Math.ceil((1 - Math.sqrt(dist)) * bands) / bands) * strength;
         const i = y * this.w + x;
+        if (onlyId >= 0 && this.id[i] !== onlyId) continue;
+        const k = (Math.ceil((1 - Math.sqrt(dist)) * bands) / bands) * strength;
         const c = this.color[i];
         const cr = Math.min(255, (c & 255) + r * k);
         const cg = Math.min(255, ((c >> 8) & 255) + g * k);

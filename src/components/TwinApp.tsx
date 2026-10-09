@@ -14,6 +14,9 @@ import { ButtonChip, RackChip, RackHoverCard, RackInspector, TerminalChip } from
 import { TerminalPanel } from "./panels/TerminalPanel";
 import { HelpDialog, SceneDescription } from "./panels/HelpDialog";
 import { ObserverPanel } from "./Observer";
+import { Icon } from "./icons";
+import { CausalityRibbon, DemoCaption, EvidencePanel, FocusLabels, ReplayButton, ScreenshotPresets, TimelineDrawer, type ShotPreset } from "./hud/Incident";
+import type { FocusName } from "@/scene/camera";
 
 type Panel = "rack" | "terminal" | null;
 
@@ -53,6 +56,12 @@ export default function TwinApp() {
   const qualityRef = useRef(quality);
   const [fullscreen, setFullscreen] = useState(false);
   const [focusing, setFocusing] = useState(false);
+  const [timeline, setTimeline] = useState(false);
+  const [evidence, setEvidence] = useState(false);
+  const [labels, setLabels] = useState(false);
+  const [follow, setFollow] = useState(true);
+  const [presenting, setPresenting] = useState(false);
+  const [shot, setShot] = useState<ShotPreset>("room");
 
   // refs for handlers created once
   const state = useRef({ panel, demoIndex, game, observer });
@@ -93,6 +102,7 @@ export default function TwinApp() {
         {
           onHover: setHover,
           onActivate: (t) => activate(t),
+          onCue: (c) => soundRef.current?.play(c),
           onQualityFallback: (q) => {
             setQuality(q);
             rt.notify("Render quality lowered", `Switched to ${QUALITY_LABEL[q]} to keep the simulation smooth.`, "info");
@@ -124,6 +134,16 @@ export default function TwinApp() {
     if (observer) game?.operator.teleport("seat");
   }, [game, observer]);
   useEffect(() => rt.subscribe(() => setPaused(rt.paused)), [rt]);
+  useEffect(() => {
+    soundRef.current?.setPaused(paused);
+  }, [paused]);
+  useEffect(() => {
+    game?.setFollow(follow);
+  }, [game, follow]);
+  // a panel the user opened owns the camera; incident following waits until it closes
+  useEffect(() => {
+    game?.setInteractionLock(panel !== null);
+  }, [game, panel]);
   useEffect(() => {
     qualityRef.current = quality;
     game?.setQuality(quality);
@@ -221,6 +241,23 @@ export default function TwinApp() {
     state.current.game?.setFocus("room");
   }, [demo, rt]);
 
+  const replay = useCallback(
+    (id: string) => {
+      setDemoIndex(-1);
+      rt.setPaused(false);
+      state.current.game?.resetOperator();
+      rt.playScenario(id);
+    },
+    [rt],
+  );
+
+  const focusScene = useCallback((f: FocusName) => state.current.game?.setFocus(f), []);
+
+  const chooseShot = useCallback((p: ShotPreset) => {
+    setShot(p);
+    state.current.game?.setFocus(p === "room" ? "room" : "rack");
+  }, []);
+
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen();
     else void document.documentElement.requestFullscreen?.().catch(() => {});
@@ -236,6 +273,9 @@ export default function TwinApp() {
         if (help) setHelp(false);
         else if (drawer) setDrawer(false);
         else if (screenshot) setScreenshot(false);
+        else if (presenting) setPresenting(false);
+        else if (evidence) setEvidence(false);
+        else if (timeline) setTimeline(false);
         else closePanel();
         return;
       }
@@ -247,24 +287,31 @@ export default function TwinApp() {
       else if (k === "m") setMuted((m) => !m);
       else if (k === "h") setScreenshot((s) => !s);
       else if (k === "g") (state.current.demoIndex >= 0 ? exitDemo : startDemo)();
+      else if (k === "t") setTimeline((v) => !v);
+      else if (k === "e") setEvidence((v) => !v);
+      else if (k === "l") setLabels((v) => !v);
+      else if (k === "c") setFollow((v) => !v);
+      else if (k === "p") setPresenting((v) => !v);
       else if (e.key === "?") setHelp(true);
       else if (e.key === "ArrowRight" && state.current.demoIndex >= 0) demoNext();
       else if (e.key === "ArrowLeft" && state.current.demoIndex >= 0) demoPrev();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [rt, help, drawer, screenshot, closePanel, restart, toggleFullscreen, startDemo, exitDemo, demoNext, demoPrev]);
+  }, [rt, help, drawer, screenshot, presenting, evidence, timeline, closePanel, restart, toggleFullscreen, startDemo, exitDemo, demoNext, demoPrev]);
 
   const ringOn = (t: Interactive) => (e: React.FocusEvent<HTMLElement>) => {
     if (e.target.matches(":focus-visible")) game?.setFocusRing(t);
   };
   const ringOff = () => game?.setFocusRing(null);
   const demoActive = demoIndex >= 0;
-  // the right dock (scenarios or demo text) is hidden while the rack inspector uses that side
-  const dockVisible = !observer && !screenshot && panel !== "rack";
+  // the right dock (scenarios or demo text) is hidden while the rack inspector or evidence uses that side
+  const dockVisible = !observer && !screenshot && panel !== "rack" && !evidence;
   const dockOpen = dockVisible && (drawer || demoActive);
   // the scene keeps clear of the rail always, and of the sheet or demo text while they show
-  const dockInset = !dockVisible ? 0 : demoActive ? DEMO_WIDTH + 32 : RAIL_WIDTH + 24 + (drawer ? SHEET_WIDTH + DOCK_GAP : 0);
+  // evidence docks on the right (CSS: min(480px, 36vw), at least 360px wide)
+  const evidenceInset = evidence && !observer && !screenshot && panel !== "rack" ? Math.max(360, Math.min(480, window.innerWidth * 0.36)) + 32 : 0;
+  const dockInset = evidenceInset ? evidenceInset : !dockVisible ? 0 : demoActive ? DEMO_WIDTH + 32 : RAIL_WIDTH + 24 + (drawer ? SHEET_WIDTH + DOCK_GAP : 0);
   useEffect(() => {
     game?.setViewInset(dockInset);
   }, [game, dockInset]);
@@ -272,7 +319,7 @@ export default function TwinApp() {
   return (
     <RuntimeContext.Provider value={rt}>
       <GameContext.Provider value={game}>
-        <main className={`twin ${screenshot ? "is-screenshot" : ""} ${observer ? "is-observer" : ""} ${focusing ? "is-focusing" : ""} ${reducedMotion ? "is-reduced" : ""}`} onPointerDown={() => soundRef.current?.unlock()}>
+        <main className={`twin ${screenshot ? "is-screenshot" : ""} ${presenting ? "is-presenting" : ""} ${observer ? "is-observer" : ""} ${focusing ? "is-focusing" : ""} ${reducedMotion ? "is-reduced" : ""}`} onPointerDown={() => soundRef.current?.unlock()}>
           <div className="stage">
             <canvas ref={canvasRef} className="scene" aria-hidden="true" />
             {canvasFailed && (
@@ -288,6 +335,7 @@ export default function TwinApp() {
                   <TerminalChip onActivate={() => activate("terminal")} onFocus={ringOn("terminal")} onBlur={ringOff} />
                   <RackChip onActivate={() => activate("rack")} onFocus={ringOn("rack")} onBlur={ringOff} />
                   <ButtonChip onActivate={() => activate("button")} onFocus={ringOn("button")} onBlur={ringOff} />
+                  {labels && <FocusLabels />}
                   {hover === "rack" && panel !== "rack" && !screenshot && <RackHoverCard />}
                   {panel === "rack" && !screenshot && <RackInspector onClose={closePanel} onPress={() => activate("button")} />}
                   {panel === "terminal" && !screenshot && <TerminalPanel onClose={closePanel} />}
@@ -306,6 +354,9 @@ export default function TwinApp() {
               <div className="hud hud-tl"><Brand onHelp={() => setHelp(true)} /></div>
               <div className="hud hud-tc"><PrimaryStatus /></div>
               <div className={`hud hud-toasts ${panel === "terminal" ? "at-br" : ""}`}><Toasts max={panel === "terminal" ? 1 : 3} /></div>
+              {((evidence && panel !== "rack") || (screenshot && shot === "evidence")) && (
+                <div className="hud hud-evidence"><EvidencePanel onClose={() => setEvidence(false)} onReplay={replay} /></div>
+              )}
               <div className="hud hud-tr">
                 <ControlBar
                   paused={paused}
@@ -315,6 +366,16 @@ export default function TwinApp() {
                   fullscreen={fullscreen}
                   quality={quality}
                   onQuality={chooseQuality}
+                  follow={follow}
+                  labels={labels}
+                  timeline={timeline}
+                  evidence={evidence}
+                  presenting={presenting}
+                  onFollow={() => setFollow((v) => !v)}
+                  onLabels={() => setLabels((v) => !v)}
+                  onTimeline={() => setTimeline((v) => !v)}
+                  onEvidence={() => setEvidence((v) => !v)}
+                  onPresent={() => setPresenting((v) => !v)}
                   onPause={() => rt.setPaused(!rt.paused)}
                   onMute={() => setMuted((m) => !m)}
                   onMotion={() => setMotionOverride(!reducedMotion)}
@@ -324,7 +385,18 @@ export default function TwinApp() {
                   onScreenshot={() => setScreenshot(true)}
                 />
               </div>
-              {panel !== "terminal" && <div className="hud hud-bl"><PromptBar hover={hover} /></div>}
+              {timeline ? (
+                <div className="hud hud-bl is-timeline">
+                  <TimelineDrawer onClose={() => { setTimeline(false); focusScene("room"); }} onFocus={focusScene} />
+                </div>
+              ) : (
+                panel !== "terminal" && (
+                  <div className="hud hud-bl">
+                    <ReplayButton onReplay={replay} />
+                    <PromptBar hover={hover} />
+                  </div>
+                )
+              )}
               {dockVisible && (
                 <div className={`hud hud-dock ${dockOpen ? "is-open" : ""}`}>
                   {demoActive ? (
@@ -334,10 +406,15 @@ export default function TwinApp() {
                   )}
                 </div>
               )}
-              <div className="hud hud-bc"><StageMini /></div>
+              <div className="hud hud-bc">
+                {demoActive && <DemoCaption index={demoIndex} />}
+                <CausalityRibbon large={presenting} />
+                <StageMini />
+              </div>
               {panel !== "rack" && <div className="hud hud-br"><TelemetrySummary /></div>}
-              {screenshot && (
-                <button className="btn screenshot-exit" onClick={() => setScreenshot(false)}>Show controls (H)</button>
+              {screenshot && <ScreenshotPresets value={shot} onChange={chooseShot} onExit={() => setScreenshot(false)} />}
+              {presenting && !screenshot && (
+                <button className="btn btn-sm present-exit" onClick={() => setPresenting(false)}><Icon name="present" size={16} /> Exit presentation (P)</button>
               )}
             </>
           )}

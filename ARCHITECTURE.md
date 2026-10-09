@@ -12,6 +12,8 @@ src/
     recovery.ts    RecoveryCoordinator: when to send the operator to P0, result hold, scenario completion
     runtime.ts     SimulationRuntime: clock, telemetry stream, scenario playback, notices, React store
     demo.ts        GuidedDemo: beats built from scenario steps, instant rebuild for "back"
+    timeline.ts    incident record: timeline entries and causality chains, derived from state before/after
+    evidence.ts    per-scenario expected-vs-observed checks, evaluated only from the timeline
   scene/      2.5D renderer: a tiny isometric voxel rasterizer on Canvas 2D
     raster.ts      per-pixel box rasterizer at render scale S: z-buffer, id buffer, light pools, outlines
     world.ts       procedural room geometry and pixel textures; rack, beacon, monitor, button visuals
@@ -19,7 +21,7 @@ src/
     camera.ts      fixed-angle camera presets and the one-shot trip push-in
     game.ts        loop: advances the runtime, renders, picks, glues DOM anchors to world points
     layout.ts      world coordinates (room, Rack A, background racks, furniture), object ids, anchors, walk graph
-  audio/sound.ts  WebAudio cues driven by SimEvents (alarm plays once per new trip)
+  audio/sound.ts  layered WebAudio: HVAC + fan hum (pitch follows P4/P5), UART ticks, footsteps, chair, cues
   components/   React HUD, contextual panels, accessibility layer
     panels/technical.ts   extension point for technical tabs (empty on purpose)
 ```
@@ -84,3 +86,14 @@ Keep a new feature out of the visible UI until it works. Don't add disabled butt
 - `src/lib/present.ts` turns controller state into labelled, iconified status (condition, EPO, reset availability and blockers).
 - `src/components/icons.tsx` is the single entry point for Phosphor interface icons.
 - `src/components/scenarios/` holds the scenario icon system (`scenarioIcons.ts`: a voxel base rendered with the room's rasterizer plus outlined 2D pixel badges, 48 × 48, generated once and cached) and the drawer metadata (`meta.ts`: category, key value, effect, tone). Scenario behaviour stays in `src/sim/scenarios.ts`.
+
+## Incident presentation
+
+Every visible reaction follows a real controller event; nothing ambient implies an event that did not happen.
+
+- **Causality and timeline.** `runtime.transmit()` and the P0 path record `TimelineEntry`s and a `CauseChain` (input → validation → classification → outputs, with the state before and after). Routine samples that change neither the reading nor the decision are not recorded. Both are in the snapshot and cleared on restart. The ribbon (`components/hud/Incident.tsx`) lights the chain node by node; the timeline drawer (T) lists entries and frames each one's object when selected.
+- **Evidence mode (E).** `evaluateEvidence()` turns the timeline into pass / pending / fail checks per scenario. `timeline.test.ts` plays every scenario headless and requires every check to pass.
+- **Scene mood.** `Game.updateMood()` eases warm / critical / current / trip / EPO / link levels toward the controller state (fast rise, slow staged fall) and `drawLights()` scales cool overhead pools, the amber rack light, the sweeping beacon, red floor reflections, the current lamp and red rack-edge light from them.
+- **Director.** `Game.direct()` frames the incident's object with centred `incident*` framings, holding each for `FOLLOW_HOLD_S`. Off with C, under reduced motion, in observer mode and while a user panel is open.
+- **Operator.** On a trip: look at the monitor → turn toward the rack → stand (chair rolls back) → walk to the inspection point. Acknowledgement walks on to P0, pauses, reaches, presses; after an accepted reset they check the rack on the way back to the desk.
+- **Presentation (P), focus labels (L), screenshot presets (H), demo captions.** Pure view state in `TwinApp`.

@@ -4,7 +4,7 @@
  * the texel size `t`). Original, tiny, and crisp under nearest-neighbour scaling.
  */
 import { textPixel } from "./font";
-import { ACCESS_DOOR, BACKGROUND_RACKS, DOOR_MAT, TEAM_SIGN, BEACON, AMBER_LAMP, CABINET, DESK, DOOR, MONITOR, OBJ, RACK, RESET, ROOM, SERVICE_AISLE, TROLLEY, type BackgroundRack } from "./layout";
+import { ACCESS_DOOR, BACKGROUND_RACKS, CABLE_REEL, CLIPBOARD, CONDUIT, CONTROLLER_MODULE, DOOR_MAT, EXTINGUISHER, JUNCTION_BOX, LINK_LED, SCHEMATIC, SERVICE_ZONE, TEAM_SIGN, BEACON, AMBER_LAMP, CABINET, DESK, DOOR, MONITOR, OBJ, RACK, RESET, ROOM, SERVICE_AISLE, TROLLEY, type BackgroundRack } from "./layout";
 import { PAL } from "./palette";
 import { CLEAR, EMISSIVE, hash2, mix, shade, type Face, type Raster, type Tex } from "./raster";
 
@@ -33,6 +33,7 @@ const SHADOW_CASTERS: [number, number, number, number][] = [
   ...BACKGROUND_RACKS.map((b) => [b.x, b.y, b.x + b.w + 1, b.y + b.d + 3] as [number, number, number, number]),
   [CABINET.x, CABINET.y, CABINET.x + CABINET.w + 1, CABINET.y + CABINET.d + 1],
   [TROLLEY.x, TROLLEY.y, TROLLEY.x + TROLLEY.w, TROLLEY.y + TROLLEY.d],
+  [CABLE_REEL.x, CABLE_REEL.y, CABLE_REEL.x + CABLE_REEL.w, CABLE_REEL.y + CABLE_REEL.d],
   [2, 57, 24, 59],
   [2, 88, 24, 99],
 ];
@@ -43,6 +44,8 @@ const TAPE = { x0: SERVICE_AISLE.x0, x1: SERVICE_AISLE.x1 - 2, y0: 1, y1: 28, w:
 const floorTex: Tex = (face, u, v, _w, _h, t) => {
   if (face !== 0) {
     if (v < 1) return PAL.floorSeam;
+    // narrow floor-edge light strip: gives the room a clean silhouette against the dark
+    if (v >= 1.4 && v < 1.4 + Math.max(t, 0.5)) return PAL.edgeLight | EMISSIVE;
     return grain(PAL.floorEdge, u, v, 0.06, 3);
   }
   const x = u, y = v;
@@ -62,6 +65,13 @@ const floorTex: Tex = (face, u, v, _w, _h, t) => {
   } else {
     c = (Math.floor(x / T) + Math.floor(y / T)) % 2 ? PAL.floorA : PAL.floorB;
     c = grain(c, x, y, 0.05, 1);
+  }
+  // painted service-zone boundary around Rack 01 and its cooling tiles (dashed, steel blue)
+  const Z = SERVICE_ZONE;
+  if (x >= Z.x0 && x < Z.x1 && y < Z.y1) {
+    const onX = x < Z.x0 + Z.w || x >= Z.x1 - Z.w;
+    const onY = y >= Z.y1 - Z.w;
+    if ((onX && frac(y / 4) < 0.62) || (onY && frac(x / 4) < 0.62)) c = mix(c, PAL.zonePaint, 0.7);
   }
   // bevelled tile edges: lit back edges, shaded front edges
   if (tu < 1 || tv < 1) c = shade(c, 1.07);
@@ -189,14 +199,28 @@ const rackBodyTex: Tex = (face, u, v, w, h, t) => {
 };
 
 /** Rack A's body: the shared cabinet plus a small RackSentinel equipment plate on its side. */
-const PLATE = { u0: 4.5, u1: 19.5, v0: 27, v1: 33.5, px: 0.42 } as const;
+const PLATE = { u0: 4.5, u1: 19.5, v0: 25, v1: 34, px: 0.42 } as const;
+/** Electrical hazard marking above the controller module. */
+const TRIANGLE = { u0: 9, v0: 7.5, s: 6 } as const;
 const rackATex: Tex = (face, u, v, w, h, t) => {
   if (face === 2 && inRect(u, v, PLATE.u0, PLATE.v0, PLATE.u1, PLATE.v1)) {
     const pu = u - PLATE.u0, pv = v - PLATE.v0, pw = PLATE.u1 - PLATE.u0, ph = PLATE.v1 - PLATE.v0;
     if (rim(pu, pv, pw, ph, t)) return shade(PAL.plate, 0.7);
     const cw = (s: string) => (s.length * 4 - 1) * PLATE.px;
-    const ink = textPixel("RACK", (pw - cw("RACK")) / 2, 0.9, pu, pv, PLATE.px) || textPixel("SENTINEL", (pw - cw("SENTINEL")) / 2, 3.6, pu, pv, PLATE.px);
-    return ink ? PAL.serverLine : pv < 0.75 ? shade(PAL.plate, 1.1) : PAL.plate;
+    const line = (s: string, v0: number) => textPixel(s, (pw - cw(s)) / 2, v0, pu, pv, PLATE.px);
+    if (pv < 2.75) return line("RISC-V", 0.6) ? PAL.plate : PAL.serverLine; // inverted header band
+    return line("RACK", 3.4) || line("SENTINEL", 5.9) ? PAL.serverLine : PAL.plate;
+  }
+  if (face === 2) {
+    // yellow electrical-hazard triangle with an exclamation mark
+    const tu = u - TRIANGLE.u0, tv = v - TRIANGLE.v0, S2 = TRIANGLE.s, H2 = S2 * 0.88;
+    const half = (vv: number) => (vv / H2) * (S2 / 2);
+    if (tv >= 0 && tv < H2 && Math.abs(tu - S2 / 2) <= half(tv)) {
+      const inner = tv > 0.9 && tv < H2 - 0.5 && Math.abs(tu - S2 / 2) <= half(tv - 0.9) - 0.15;
+      if (!inner) return PAL.serverLine;
+      if (Math.abs(tu - S2 / 2) < 0.35 && ((tv > 2 && tv < 3.7) || (tv > 4.0 && tv < 4.5))) return PAL.serverLine;
+      return PAL.safetyYellow;
+    }
   }
   return rackBodyTex(face, u, v, w, h, t);
 };
@@ -293,8 +317,9 @@ export function drawBackgroundLeds(r: Raster, time: number, reducedMotion: boole
   const lit = mix(PAL.ledIdle, PAL.bgHaze, 0.4) | EMISSIVE;
   for (let i = 0; i < BG_LEDS.length; i++) {
     const L = BG_LEDS[i];
-    const step = Math.floor(time * (reducedMotion ? 0.15 : L.rate));
-    if (hash2(i, step, 31) < 0.45) continue;
+    // slower and steadier than Rack 01, so the controlled rack reads as the live one
+    const step = Math.floor(time * (reducedMotion ? 0.1 : L.rate * 0.45));
+    if (hash2(i, step, 31) < 0.55) continue;
     r.drawBox({ x: L.x, y: L.y, z: L.z, w: 1, d: 0.3, h: 0.75, tex: lit });
   }
 }
@@ -363,6 +388,72 @@ const housingTex: Tex = (face, u, v, w, h, t) => {
   return PAL.resetHousing;
 };
 
+/** Wall schematic of the RackSentinel SoC: a block diagram in thin light lines on a blueprint board. */
+const schematicTex: Tex = (face, u, v, w, h, t) => {
+  if (face !== 1) return PAL.steelDark;
+  if (rim(u, v, w, h, t)) return PAL.steel;
+  if (band(u, v, w, h, 0.7)) return shade(PAL.blueprint, 0.8);
+  const ink = PAL.blueprintInk;
+  if (textPixel("SOC", 1.5, 1.3, u, v, 0.5)) return ink;
+  if (v > 4 && v < 4 + t * 1.5 && u > 1.5 && u < w - 1.5) return shade(ink, 0.6);
+  // blocks (CPU, memory, UART, GPIO, controller I/O) joined by a bus
+  const boxes: [number, number, number, number][] = [[2, 6, 9, 11], [11, 6, 18, 11], [2, 13, 9, 18], [11, 13, 18, 18], [20, 6, 24, 18]];
+  for (const [a0, b0, a1, b1] of boxes) {
+    if (inRect(u, v, a0, b0, a1, b1)) return rim(u - a0, v - b0, a1 - a0, b1 - b0, t) ? ink : PAL.blueprint;
+  }
+  if (Math.abs(v - 12) < t && u > 5.5 && u < 20) return ink;
+  if ((Math.abs(u - 5.5) < t || Math.abs(u - 14.5) < t) && v > 11 && v < 13) return ink;
+  return PAL.blueprint;
+};
+
+/** Maintenance clipboard by P0: board, clip, a ticked checklist. */
+const clipboardTex: Tex = (face, u, v, w, h, t) => {
+  if (face !== 1) return PAL.clipboard;
+  if (v < 1.2 && Math.abs(u - w / 2) < 1.6) return PAL.steelLight;
+  if (rim(u, v, w, h, t) || u < 0.6 || u >= w - 0.6 || v < 1 || v >= h - 0.5) return PAL.clipboard;
+  if (v > 2 && (v - 2) % 1.4 < Math.max(t, 0.3) && u > 1.6 && u < w - 1) return 0x8c949c;
+  if (v > 2 && (v - 2) % 1.4 < 0.9 && u > 0.9 && u < 1.4) return 0x6d8a72;
+  return PAL.paper;
+};
+
+/** Fire-extinguisher cabinet: muted red (never an alarm colour), glazed door, extinguisher inside. */
+const extinguisherTex: Tex = (face, u, v, w, h, t) => {
+  if (face !== 2 || rim(u, v, w, h, t)) return rim(u, v, w, h, t) ? shade(PAL.extinguisher, 0.7) : PAL.extinguisher;
+  if (inRect(u, v, 1.2, 1.5, w - 1.2, h - 2.5)) {
+    if (inRect(u, v, w / 2 - 1.4, 3.5, w / 2 + 1.4, h - 3)) return v < 4.5 ? 0x2b2b2b : 0x8f2f2a;
+    return v - u * 0.6 > 4 && v - u * 0.6 < 4.6 ? 0x9fb2bd : 0x3a4650;
+  }
+  return PAL.extinguisher;
+};
+
+/** Spare cable reel: steel flanges, wound cable on top. */
+const reelTex: Tex = (face, u, v, w, h, t) => {
+  if (face === 0) {
+    const r = Math.hypot(u - w / 2, v - h / 2);
+    if (r > w / 2 - 0.4) return PAL.steelDark;
+    if (r < 1) return PAL.steel;
+    return Math.floor(r / 0.7) % 2 ? PAL.cable : shade(PAL.cable, 1.6);
+  }
+  if (v < 1 || v >= h - 1) return rim(u, v, w, h, t) ? shade(PAL.steelDark, 0.8) : PAL.steelDark;
+  return Math.floor(u / 0.8) % 2 ? PAL.cable : shade(PAL.cable, 1.3);
+};
+
+const junctionTex: Tex = (face, u, v, w, h, t) => {
+  if (rim(u, v, w, h, t)) return shade(PAL.steelDark, 0.8);
+  if (face === 1 && disc(u, v, 1, 1, 0.35)) return PAL.bolt;
+  if (face === 1 && inRect(u, v, 1.5, 3, w - 1.5, 4.6)) return PAL.safetyYellow;
+  return PAL.steelDark;
+};
+
+const conduitTex: Tex = (face, u) => (face === 0 ? shade(PAL.conduit, 1.1) : u % 12 < 0.8 ? shade(PAL.conduit, 0.75) : PAL.conduit);
+
+/** RackSentinel controller module on Rack 01's side. */
+const moduleTex: Tex = (face, u, v, w, h, t) => {
+  if (rim(u, v, w, h, t)) return PAL.serverLine;
+  if (face === 2 && v > 1 && v < h - 1 && u > 3 && u < w - 1 && (u - 3) % 1.2 < 0.5) return PAL.vent;
+  return 0x22272d;
+};
+
 /** Everything that never changes; rasterized once into the base layer. */
 export function buildStatic(r: Raster): void {
   const { W, D, H, wall } = ROOM;
@@ -376,6 +467,16 @@ export function buildStatic(r: Raster): void {
   r.drawBox({ x: 22, y: 0, z: 75, w: 24, d: 2.5, h: 2.5, tex: fixtureTex });
   r.drawBox({ x: 124, y: 0, z: 75, w: 20, d: 2.5, h: 2.5, tex: fixtureTex });
 
+  // power conduit along the back wall into Rack 01's side, fed from a junction box
+  r.drawBox({ ...JUNCTION_BOX, tex: junctionTex });
+  r.drawBox({ x: CONDUIT.x0, y: CONDUIT.y, z: CONDUIT.z, w: RACK.x - CONDUIT.x0, d: CONDUIT.size, h: CONDUIT.size, tex: conduitTex });
+  r.drawBox({ x: 52.5, y: CONDUIT.y, z: JUNCTION_BOX.z + JUNCTION_BOX.h, w: CONDUIT.size, d: CONDUIT.size, h: ROOM.H - JUNCTION_BOX.z - JUNCTION_BOX.h, tex: conduitTex });
+
+  // a few wall details: SoC schematic, maintenance clipboard by P0, extinguisher cabinet by the door
+  r.drawBox({ ...SCHEMATIC, tex: schematicTex });
+  r.drawBox({ ...CLIPBOARD, tex: clipboardTex });
+  r.drawBox({ ...EXTINGUISHER, tex: extinguisherTex });
+
   // entrance mat with the competition logo, and the team plaque (both id NONE)
   r.drawBox({ x: DOOR_MAT.x, y: DOOR_MAT.y, z: 0, w: DOOR_MAT.w, d: DOOR_MAT.d, h: 0.4, tex: matTex });
   r.drawBox({ ...TEAM_SIGN, tex: teamSignTex });
@@ -384,6 +485,7 @@ export function buildStatic(r: Raster): void {
   r.drawBox({ ...CABINET, tex: hazed(cabinetTex, 0.12) });
   for (const b of BACKGROUND_RACKS) drawBackgroundRack(r, b);
   drawTrolley(r);
+  r.drawBox({ ...CABLE_REEL, z: 0, tex: hazed(reelTex, 0.2) });
 
   // cable trays carrying the UART run from the terminal to the rack
   r.drawBox({ x: 0, y: 5, z: 68, w: 5, d: 79, h: 3, tex: trayTex });
@@ -404,6 +506,7 @@ export function buildStatic(r: Raster): void {
 
   // rack cabinet, the P0 station on its side, and the plinths on its roof
   r.drawBox({ ...RACK, tex: rackATex, id: OBJ.RACK });
+  r.drawBox({ ...CONTROLLER_MODULE, tex: moduleTex, id: OBJ.RACK });
   r.drawBox({ ...RESET.housing, tex: housingTex, id: OBJ.BUTTON });
   r.drawBox({ x: RESET.cap.x, y: RESET.cap.y - 1, z: RESET.cap.z - 1, w: 1, d: RESET.cap.d + 2, h: RESET.cap.h + 2, tex: PAL.resetHousingDark, id: OBJ.BUTTON });
   r.drawBox({ x: BEACON.x - 1, y: BEACON.y - 1, z: 80, w: 8, d: 8, h: 2, tex: PAL.rackEdge, id: OBJ.RACK });
@@ -446,6 +549,12 @@ export interface RackLook {
   monitorEpo: boolean;
   readings: { v: number; i: number; t: number; got: boolean };
   linkSilent: boolean;
+  /** RackSentinel module heartbeat LED. */
+  heartbeat: boolean;
+  /** UART link indicator brightness 0..1 (fades when the link goes silent). */
+  link: number;
+  /** A rejected packet just arrived: the DCIM display tears briefly. */
+  glitch: boolean;
 }
 
 const LAMP_U = [2.5, 8.5, 14.5, 20.5];
@@ -579,6 +688,12 @@ export function drawRackDynamic(r: Raster, L: RackLook): void {
   r.drawBox({ x: AMBER_LAMP.x + 1, y: AMBER_LAMP.y + 1, z: 82, w: 4, d: 4, h: 4, tex: lensTex(L.overload, PAL.warn, PAL.warnDim), id: OBJ.RACK });
   const c = RESET.cap;
   r.drawBox({ x: c.x, y: c.y, z: c.z, w: L.capPressed ? 1.25 : c.w, d: c.d, h: c.h, tex: capTex(L.capPressed, L.capHeld), id: OBJ.BUTTON });
+  // controller module heartbeat: neutral and quiet, present whenever the controller runs
+  const m = CONTROLLER_MODULE;
+  r.drawBox({ x: m.x + m.w, y: m.y + 1, z: m.z + m.h - 2, w: 0.3, d: 1.2, h: 1, tex: L.heartbeat ? PAL.ledIdle | EMISSIVE : PAL.ledOff, id: OBJ.RACK });
+  // UART link indicator where the tray meets the rack
+  const k = Math.max(0, Math.min(1, L.link));
+  r.drawBox({ ...LINK_LED, tex: k > 0.05 ? mix(PAL.ledOff, PAL.ledIdle, k) | EMISSIVE : PAL.ledOff });
 }
 
 function monitorTex(L: RackLook): Tex {
@@ -609,7 +724,12 @@ function monitorTex(L: RackLook): Tex {
       }
       return glyph ? screen : head | EMISSIVE;
     }
-    if (L.linkSilent && sv >= 4 && (Math.floor(su) + Math.floor(sv) + Math.floor(L.time * 2)) % 7 === 0) return shade(PAL.screenText, 0.45) | EMISSIVE;
+    // rejected packet: a brief horizontal tear across the display
+    if (L.glitch && Math.floor(sv * 1.5 + L.time * 30) % 5 === 0) return mix(PAL.warn, PAL.screenBg, 0.45) | EMISSIVE;
+    // link silent: frozen on the last reading, with a hold mark in the corner
+    if (L.linkSilent && sv >= 15 && sv < 16.5 && su >= 19 && su < 22 && (su < 20 || su >= 21)) return PAL.warn | EMISSIVE;
+    // live: a blinking cursor (stops with the link)
+    if (!L.linkSilent && sv >= 15.25 && sv < 16.25 && su >= 0.5 && su < 1.5 && Math.floor(L.time * 1.8) % 2 === 0) return PAL.screenText | EMISSIVE;
     for (let g = 0; g < 3; g++) {
       const top = 4 + g * 4.25;
       if (sv >= top && sv < top + 3.5) {
@@ -622,7 +742,9 @@ function monitorTex(L: RackLook): Tex {
         if (tick(gz.tripAt)) return PAL.crit | EMISSIVE;
         if (sv >= top + 0.75 && sv < top + 2.5 && bu < span) {
           const filled = got && bu < Math.max(0, Math.min(1, gz.frac)) * span;
-          return filled ? PAL.screenText | EMISSIVE : shade(PAL.screenText, 0.22) | EMISSIVE;
+          // live refresh: a soft scan line rolls down the gauges; frozen gauges dim
+          const k = L.linkSilent ? 0.6 : Math.abs(sv - ((L.time * 5) % 16.5)) < 0.5 ? 1.18 : 1;
+          return filled ? shade(PAL.screenText, k) | EMISSIVE : shade(PAL.screenText, 0.22) | EMISSIVE;
         }
         return screen;
       }

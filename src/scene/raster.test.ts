@@ -7,6 +7,7 @@ import { BG_LEDS, buildStatic, drawBackgroundLeds, drawMonitor, drawRackDynamic,
 const LOOK: RackLook = {
   time: 0, tempClass: 0, overload: false, epo: false, fanAngle: 0, fanLevel: 0, ledRate: 1, flash: false,
   capPressed: false, capHeld: false, monitorState: "ok", monitorEpo: false, readings: { v: 230, i: 127, t: 53, got: true }, linkSilent: false,
+  heartbeat: true, link: 1, glitch: false,
 };
 /** Every output on: Critical, current trip, EPO latched, P0 pressed. */
 const ALARM: RackLook = {
@@ -144,6 +145,7 @@ describe("enlarged room layout", () => {
     expect(idAt(r, ANCHORS.rackSide, 0.5)).toBe(OBJ.RACK);
     expect(idAt(r, ANCHORS.monitor, 2)).toBe(OBJ.TERMINAL);
     expect(idAt(r, ANCHORS.desk, 0.5)).toBe(OBJ.TERMINAL);
+    for (const lamp of [ANCHORS.lampP4, ANCHORS.lampP5, ANCHORS.lampP6, ANCHORS.lampP7]) expect(idAt(r, lamp, 0.5)).toBe(OBJ.RACK);
     const [bx, by] = r.project(...ANCHORS.button);
     let near = false;
     for (let dy = -6; dy <= 6 && !near; dy++) for (let dx = -6; dx <= 6 && !near; dx++) near = r.id[(Math.floor(by) + dy) * r.w + Math.floor(bx) + dx] === OBJ.BUTTON;

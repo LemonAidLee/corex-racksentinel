@@ -49,6 +49,22 @@ export const DOOR_MAT = { x: 3, y: 103, w: 17, d: 44 } as const;
 /** Small CoreX team plaque on the back wall, above the ventilation grille. */
 export const TEAM_SIGN = { x: 24, y: 0, z: 55, w: 24, d: 0.8, h: 10 } as const;
 
+/** Environmental storytelling: few, quiet props. About a third of the walls stay empty. */
+export const SCHEMATIC = { x: 56, y: 0, z: 34, w: 26, d: 0.6, h: 20 } as const;
+export const CLIPBOARD = { x: 135, y: 0, z: 36, w: 6, d: 0.7, h: 9 } as const;
+/** Fire-extinguisher cabinet on the left wall, beside the access door. */
+export const EXTINGUISHER = { x: 0, y: 103, z: 18, w: 1.6, d: 8, h: 16 } as const;
+export const CABLE_REEL = { x: 190, y: 62, w: 9, d: 9, h: 7 } as const;
+/** Power conduit along the back wall into Rack 01's side, with its junction box. */
+export const CONDUIT = { x0: 56, z: 76.5, y: 0.6, size: 1.6 } as const;
+export const JUNCTION_BOX = { x: 50, y: 0, z: 72, w: 6, d: 1.5, h: 8 } as const;
+/** Painted service zone around Rack 01 and its cooling tiles. */
+export const SERVICE_ZONE = { x0: 80, x1: 121, y1: 53, w: 0.7 } as const;
+/** RackSentinel controller module on Rack 01's side: a quiet heartbeat LED. */
+export const CONTROLLER_MODULE = { x: 114, y: 3, z: 57, w: 1.2, d: 9, h: 6 } as const;
+/** UART link indicator where the cable tray meets Rack 01. */
+export const LINK_LED = { x: 82, y: 5, z: 69.5, w: 1.5, d: 0.5, h: 1.2 } as const;
+
 /** Points on the UART cable tray, from the DCIM terminal to Rack A (and only Rack A). */
 export const UART_PATH: [number, number, number][] = [
   [1.5, 81, 26],
@@ -79,6 +95,7 @@ export const OBSTACLES: [number, number, number, number][] = [
   [DESK.x, DESK.y, DESK.x + DESK.w, DESK.y + DESK.d],
   [CABINET.x, CABINET.y, CABINET.x + CABINET.w, CABINET.y + CABINET.d],
   [TROLLEY.x, TROLLEY.y, TROLLEY.x + TROLLEY.w, TROLLEY.y + TROLLEY.d],
+  [CABLE_REEL.x, CABLE_REEL.y, CABLE_REEL.x + CABLE_REEL.w, CABLE_REEL.y + CABLE_REEL.d],
 ];
 
 /** World points the camera and DOM overlays anchor to. */
@@ -90,6 +107,11 @@ export const ANCHORS = {
   monitor: [9, 76, 52],
   desk: [14, 78, 24],
   room: [108, 76, 30],
+  /** P4..P7 lamps on Rack 01's door (door front y = 26, lamp row centre z = 74). */
+  lampP4: [91.5, 26, 74],
+  lampP5: [97.5, 26, 74],
+  lampP6: [103.5, 26, 74],
+  lampP7: [109.5, 26, 74],
 } as const satisfies Record<string, readonly [number, number, number]>;
 export type AnchorName = keyof typeof ANCHORS;
 

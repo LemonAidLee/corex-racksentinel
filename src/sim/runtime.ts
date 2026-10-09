@@ -10,6 +10,7 @@ import { EventBus, type Notice, type NoticeTone, type SimEvents, type TelemetryK
 import { encodeSample } from "./protocol";
 import { RecoveryCoordinator, type RecoveryPhase } from "./recovery";
 import { SCENARIOS, type Scenario, type ScenarioStep } from "./scenarios";
+import { RESET_ENTRY, digest, resetChain, telemetryChain, telemetryEntries, type CauseChain, type TimelineEntry } from "./timeline";
 import { ampsToRaw, degCToRaw, fmtAmps, fmtDegC, voltsToRaw } from "./units";
 
 export interface RawConditions {
@@ -44,13 +45,17 @@ export interface SimSnapshot {
   streaming: boolean;
   lastSampleAt: number | null;
   p0Down: boolean;
-  lastFrame: { kind: TelemetryKind; outcome: FrameResult["outcome"]; reply: number[]; at: number } | null;
+  lastFrame: { kind: TelemetryKind; outcome: FrameResult["outcome"]; frame: number[]; reply: number[]; at: number } | null;
   lastReset: { outcome: ResetOutcome; at: number } | null;
   resetBlockers: ResetOutcome[];
   scenario: { id: string; name: string; running: boolean; stage: ScenarioStage | null } | null;
   recovery: RecoveryPhase;
   paused: boolean;
   notices: Notice[];
+  /** Meaningful events since the last restart, oldest first. */
+  timeline: TimelineEntry[];
+  /** The latest controller decision, for the causality ribbon. */
+  chain: CauseChain | null;
 }
 
 export const STREAM_PERIOD_MS = 3000;
@@ -61,6 +66,8 @@ export const SCENARIO_TAIL_MS = 1500;
 export const ALERT_GAP_MS = 1200;
 /** How long the "Scenario complete" line stays in the prompt bar. */
 const COMPLETE_STAGE_MS = 7000;
+/** Timeline entries kept per run. */
+const TIMELINE_MAX = 120;
 
 export const RESET_MESSAGES: Record<ResetOutcome, { title: string; detail?: string; tone: NoticeTone }> = {
   accepted: { title: "Reset accepted", detail: "Safe conditions verified · EPO request cleared", tone: "ok" },
@@ -98,6 +105,11 @@ export class SimulationRuntime {
   private noticeSeq = 0;
   /** Simulation time the next alert may appear (see notify). */
   private nextNoticeAt = 0;
+  private timeline: TimelineEntry[] = [];
+  private chain: CauseChain | null = null;
+  private recordSeq = 0;
+  /** The packet being sent is a scripted external recovery reading. */
+  private recoveryReading = false;
   private quiet = 0;
   private listeners = new Set<() => void>();
   private snap: SimSnapshot;
@@ -140,6 +152,8 @@ export class SimulationRuntime {
       recovery: this.recovery.phase,
       paused: this.paused,
       notices: this.notices,
+      timeline: this.timeline,
+      chain: this.chain,
     };
   }
 
@@ -206,6 +220,8 @@ export class SimulationRuntime {
     if (!opts.keepScenario) this.scenario = null;
     this.notices = [];
     this.nextNoticeAt = 0;
+    this.timeline = [];
+    this.chain = null;
     this.bus.emit("restart", {});
     this.bus.emit("state", this.controller.snapshot());
     this.changed();
@@ -219,6 +235,7 @@ export class SimulationRuntime {
     this.agent?.returnToDesk();
     this.notify(def.name, def.summary, "info");
     this.setStage({ title: "Scenario started", detail: def.summary, tone: "info" });
+    this.record({ kind: "scenario", title: `Scenario started · ${def.name}`, detail: `${def.testCase} · ${def.summary}`, tone: "info", focus: "room" });
     this.bus.emit("scenario", { id, phase: "start" });
     const last = def.steps.reduce((m, s) => Math.max(m, s.at), 0);
     for (const step of def.steps) this.schedule(step.at, () => this.runStep(step, false));
@@ -253,6 +270,7 @@ export class SimulationRuntime {
         : "No EPO request was latched, so no reset was needed.";
     sc.stage = { title: "Scenario complete", detail, tone: epo ? "warn" : "ok" };
     sc.running = false;
+    this.record({ kind: "scenario", title: "Scenario completed", detail, tone: epo ? "warn" : "ok", focus: "room" });
     this.bus.emit("scenario", { id: sc.def.id, phase: "end" });
     const def = sc.def;
     this.schedule(COMPLETE_STAGE_MS, () => {
@@ -328,7 +346,12 @@ export class SimulationRuntime {
     if (sc && !sc.recovering) this.notify("External rack conditions recovering", "Simulated environment change, sent as a new DCIM sample.", "info");
     if (sc) sc.recovering = true;
     this.setStage({ title: "External conditions recovering", detail: "Simulated rack environment. RackSentinel only measures it.", tone: "info" });
-    this.setConditions({ volts: c.volts ?? 230, amps: c.amps, degC: c.degC }, true);
+    this.recoveryReading = true;
+    try {
+      this.setConditions({ volts: c.volts ?? 230, amps: c.amps, degC: c.degC }, true);
+    } finally {
+      this.recoveryReading = false;
+    }
     const s = this.controller.state;
     if (!s.epo) {
       this.setStage({ title: "External conditions recovered", detail: `${fmtDegC(s.latestTemp)} · ${fmtAmps(s.latestCurrent)}. No EPO request, nothing to reset.`, tone: "ok" });
@@ -364,6 +387,7 @@ export class SimulationRuntime {
     if (this.streaming === on) return;
     this.streaming = on;
     this.nextStreamAt = this.time + (on ? 400 : 0);
+    this.record({ kind: "link", title: on ? "Telemetry link resumed" : "Telemetry link silent", detail: on ? undefined : "Controller holds its last valid state.", tone: on ? "info" : "warn", focus: "desk" });
     if (on) this.notify("Telemetry resumed", "The DCIM terminal is sending samples again.", "info");
     else this.notify("Telemetry stopped", "Controller holds its last valid state. P0 still works locally.", "warn");
     this.changed();
@@ -382,8 +406,13 @@ export class SimulationRuntime {
     const result = this.controller.receiveFrame(frame);
     const after = this.controller.snapshot();
     this.lastSampleAt = this.time;
-    this.lastFrame = { kind, outcome: result.outcome, reply: result.reply, at: this.time };
-    if (!this.quiet) this.bus.emit("telemetry", { kind, result });
+    this.lastFrame = { kind, outcome: result.outcome, frame: result.frame, reply: result.reply, at: this.time };
+    if (!this.quiet) {
+      this.bus.emit("telemetry", { kind, result });
+      for (const e of telemetryEntries(kind, result, before, after, this.recoveryReading)) this.record(e);
+      const nodes = telemetryChain(kind, result, before, after);
+      if (nodes) this.setChain("telemetry", nodes, before, after);
+    }
     this.describeTransition(before, after, result);
     this.bus.emit("state", after);
     this.changed();
@@ -482,7 +511,16 @@ export class SimulationRuntime {
 
   private recordReset(outcome: ResetOutcome, fromOperator = false): void {
     this.lastReset = { outcome, at: this.time };
-    if (!this.quiet) this.bus.emit("reset", { outcome });
+    if (!this.quiet) {
+      this.bus.emit("reset", { outcome });
+      const s = this.controller.state;
+      const e = RESET_ENTRY[outcome];
+      const quietHold = outcome === "not-latched" && this.scenario?.def.id === "held-button";
+      if (e && !quietHold) this.record({ kind: "reset", title: e.title, tone: e.tone, focus: "button", reset: outcome });
+      const nodes = resetChain(outcome, s);
+      // the press itself changed only the latch: "before" is the same state with P7 still on
+      if (nodes) this.setChain("reset", nodes, { ...digest(s, this.p0Down), epo: true, pins: s.pins | (outcome === "accepted" ? 0x80 : 0) }, digest(s, this.p0Down));
+    }
     const m = RESET_MESSAGES[outcome];
     // A hold that starts with nothing latched is not a reset attempt worth announcing.
     if (outcome === "not-latched" && this.scenario?.def.id === "held-button") {
@@ -493,6 +531,18 @@ export class SimulationRuntime {
     this.notify(m.title, m.detail, m.tone);
     if (outcome !== "accepted" && outcome !== "not-latched") this.setStage({ title: m.title, detail: m.detail, tone: m.tone });
     this.recovery.onReset(outcome, fromOperator);
+  }
+
+  // ---------------------------------------------------------------- incident record
+  private record(e: Omit<TimelineEntry, "id" | "at" | "values">): void {
+    if (this.quiet) return;
+    const entry: TimelineEntry = { ...e, id: ++this.recordSeq, at: this.time, values: digest(this.controller.state, this.p0Down) };
+    this.timeline = [...this.timeline.slice(-(TIMELINE_MAX - 1)), entry];
+  }
+
+  private setChain(kind: CauseChain["kind"], nodes: CauseChain["nodes"], before: ControllerState | CauseChain["before"], after: ControllerState | CauseChain["after"]): void {
+    const d = (s: ControllerState | CauseChain["before"]) => ("latestTemp" in s ? digest(s, this.p0Down) : s);
+    this.chain = { id: ++this.recordSeq, at: this.time, kind, nodes, before: d(before), after: d(after) };
   }
 
   // ---------------------------------------------------------------- notices

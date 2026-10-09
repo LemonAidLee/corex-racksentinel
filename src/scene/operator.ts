@@ -1,6 +1,11 @@
 /**
  * The operator: movement logic (independent of rendering) plus a voxel model built from boxes.
  * Small animation set: sit (relaxed / alert), stand, walk, inspect, press, release a held button.
+ *
+ * Incident response is a short, purposeful sequence: monitoring → notices the alert (turns to
+ * the monitor) → turns toward the rack → stands (chair rolls back) → walks to the inspection
+ * point → checks the rack and waits. Acknowledging walks on to P0, pauses beside it, reaches,
+ * presses; after an accepted reset the operator checks the rack indicators on the way back.
  */
 import { CHAIN, NODES, OBJ, type NodeName } from "./layout";
 import { PAL } from "./palette";
@@ -19,9 +24,21 @@ export interface OperatorHooks {
   /** Called when the operator unsticks a held P0. */
   onRelease(): void;
   isHeld(): boolean;
+  /** A foot touched the floor (footstep sound). */
+  onStep?(): void;
+  /** The chair moved as the operator stood up or sat down. */
+  onChair?(): void;
 }
 
-type Action = { kind: "press"; t: number; phase: "release" | "down" | "up" | "done" } | null;
+type Action = { kind: "press"; t: number; phase: "approach" | "release" | "down" | "up" | "done" } | null;
+
+/** Pause beside P0 before reaching for it. */
+const APPROACH_S = 0.45;
+/** Seconds between noticing an alert and turning toward the rack, then standing up. */
+const NOTICE_S = 0.7;
+const TURN_S = 0.5;
+/** Look at the rack indicators after an accepted reset, before walking back. */
+const CONFIRM_S = 1.1;
 
 export class Operator {
   x: number = NODES.seat.x;
@@ -42,11 +59,35 @@ export class Operator {
   /** Walk speed multiplier (reduced motion shortens transitions). */
   speedScale = 1;
   target: NodeName = "seat";
+  /** 0 = chair tucked at the desk, 1 = rolled back (operator standing). Eased. */
+  chairRoll = 0;
+  /** A short scripted pause (turn, confirm) and what follows it. */
+  private wait: { t: number; then: () => void } | null = null;
+  private lastStepSign = 0;
+  private idleT = 0;
 
   constructor(private hooks: OperatorHooks) {}
 
   get busy(): boolean {
-    return this.path.length > 0 || this.action !== null;
+    return this.path.length > 0 || this.action !== null || this.wait !== null;
+  }
+
+  private after(seconds: number, then: () => void): void {
+    this.wait = { t: seconds / this.speedScale, then };
+  }
+
+  /**
+   * Respond to a new trip: look at the monitor, turn toward the rack, stand, walk to the
+   * inspection point and check the rack. Only from the desk, and only when nothing else is going on.
+   */
+  respond(): void {
+    if (this.busy || this.pose !== "sit") return;
+    this.alert = true;
+    this.facing = "nx";
+    this.after(NOTICE_S, () => {
+      this.facing = "px";
+      this.after(TURN_S, () => this.goInspect());
+    });
   }
 
   get location(): NodeName {
@@ -59,6 +100,7 @@ export class Operator {
     this.target = node;
     if (this.action?.kind === "press" && this.action.phase === "up") this.hooks.onPressUp();
     this.action = null;
+    this.wait = null;
     // Mid-segment, keep heading to the next node first so movement stays on the graph.
     const cur = this.path.length ? this.path[0] : this.at;
     const seq: number[] = this.path.length ? [cur] : [];
@@ -69,11 +111,22 @@ export class Operator {
     this.path = seq;
     this.arrival = then ?? null;
     if (!this.path.length) this.arrive();
-    else if (this.pose === "sit") this.pose = "stand";
+    else if (this.pose === "sit") {
+      this.pose = "stand";
+      this.hooks.onChair?.();
+    }
   }
 
-  goToDesk(): void {
-    this.goTo("seat");
+  /** Walk back to the desk. With `confirm`, stop at the rack first to check its indicators. */
+  goToDesk(confirm = false): void {
+    const rackIdx = CHAIN.indexOf("rack");
+    if (confirm && this.at > rackIdx && !this.path.length) {
+      this.goTo("rack", () => {
+        this.pose = "inspect";
+        this.facing = "ny";
+        this.after(CONFIRM_S, () => this.goTo("seat"));
+      });
+    } else this.goTo("seat");
   }
 
   goInspect(): void {
@@ -83,7 +136,7 @@ export class Operator {
   pressButton(): void {
     this.goTo("button", () => {
       this.facing = "nx";
-      this.action = { kind: "press", t: 0, phase: this.hooks.isHeld() ? "release" : "down" };
+      this.action = { kind: "press", t: 0, phase: "approach" };
     });
   }
 
@@ -95,6 +148,7 @@ export class Operator {
     if (this.action?.kind === "press" && this.action.phase === "up") this.hooks.onPressUp();
     this.action = null;
     this.arrival = null;
+    this.wait = null;
     if (this.path.length) {
       this.path = [this.path[0]];
       this.target = CHAIN[this.path[0]];
@@ -107,7 +161,9 @@ export class Operator {
   teleport(node: NodeName): void {
     this.path = [];
     this.action = null;
+    this.wait = null;
     this.at = CHAIN.indexOf(node);
+    this.chairRoll = node === "seat" ? 0 : 1;
     this.x = NODES[node].x;
     this.y = NODES[node].y;
     this.target = node;
@@ -136,6 +192,7 @@ export class Operator {
   private arrive(): void {
     const node = CHAIN[this.at];
     if (node === "seat") {
+      if (this.pose !== "sit") this.hooks.onChair?.();
       this.pose = "sit";
       this.facing = this.alert ? "nx" : "py";
     } else if (node === "rack") {
@@ -152,6 +209,23 @@ export class Operator {
 
   update(dt: number): void {
     this.reactT = Math.max(0, this.reactT - dt);
+    // the chair rolls back while the operator is up, and is pulled in again when they sit
+    const rollTo = this.pose === "sit" ? 0 : 1;
+    this.chairRoll += (rollTo - this.chairRoll) * Math.min(1, dt * 7 * this.speedScale);
+    // ambient: a calm, seated operator now and then turns to read the monitor
+    if (this.pose === "sit" && !this.alert && !this.busy) {
+      this.idleT += dt;
+      this.facing = this.idleT % 17 > 13 ? "nx" : "py";
+    } else this.idleT = 0;
+    if (this.wait) {
+      this.wait.t -= dt;
+      if (this.wait.t <= 0) {
+        const then = this.wait.then;
+        this.wait = null;
+        then();
+      }
+      return;
+    }
     if (this.glanceT > 0) {
       this.glanceT -= dt;
       if (this.glanceT <= 0 && this.location === "rack" && !this.busy) this.facing = "ny";
@@ -159,6 +233,11 @@ export class Operator {
     if (this.path.length) {
       this.pose = "walk";
       this.walkT += dt;
+      const sign = Math.sign(Math.sin(this.walkT * 9));
+      if (sign !== this.lastStepSign) {
+        this.lastStepSign = sign;
+        this.hooks.onStep?.();
+      }
       let budget = WALK_SPEED * this.speedScale * dt;
       while (budget > 0 && this.path.length) {
         const n = NODES[CHAIN[this.path[0]]];
@@ -182,7 +261,14 @@ export class Operator {
     const a = this.action;
     if (a?.kind === "press") {
       a.t += dt;
-      if (a.phase === "release") {
+      if (a.phase === "approach") {
+        // a brief look at the station before the hand goes out
+        this.pose = "stand";
+        if (a.t > APPROACH_S / this.speedScale) {
+          a.phase = this.hooks.isHeld() ? "release" : "down";
+          a.t = 0;
+        }
+      } else if (a.phase === "release") {
         this.pose = "release";
         if (a.t > 0.55) {
           this.hooks.onRelease();

@@ -82,6 +82,8 @@ function CtlButton({ icon, label, onClick, pressed, shortcut }: { icon: IconName
 
 export function ControlBar(p: {
   paused: boolean; muted: boolean; reducedMotion: boolean; demo: boolean; fullscreen: boolean; quality: Quality;
+  follow: boolean; labels: boolean; timeline: boolean; evidence: boolean; presenting: boolean;
+  onFollow: () => void; onLabels: () => void; onTimeline: () => void; onEvidence: () => void; onPresent: () => void;
   onPause: () => void; onMute: () => void; onMotion: () => void; onFullscreen: () => void; onReset: () => void; onDemo: () => void; onScreenshot: () => void;
   onQuality: (q: Quality) => void;
 }) {
@@ -96,6 +98,13 @@ export function ControlBar(p: {
           <option key={q} value={q}>{QUALITY_LABEL[q]}</option>
         ))}
       </select>
+      <div className="toolgroup" role="group" aria-label="Incident views">
+        <CtlButton icon="follow" label="Follow incident camera" onClick={p.onFollow} pressed={p.follow && !p.reducedMotion} shortcut="C" />
+        <CtlButton icon="labels" label="P4–P7 focus labels" onClick={p.onLabels} pressed={p.labels} shortcut="L" />
+        <CtlButton icon="timeline" label="Event timeline" onClick={p.onTimeline} pressed={p.timeline} shortcut="T" />
+        <CtlButton icon="evidence" label="Evidence mode" onClick={p.onEvidence} pressed={p.evidence} shortcut="E" />
+        <CtlButton icon="present" label="Presentation mode" onClick={p.onPresent} pressed={p.presenting} shortcut="P" />
+      </div>
       <div className="toolgroup" role="group" aria-label="Simulation and view">
         <CtlButton icon={p.paused ? "play" : "pause"} label={p.paused ? "Resume simulation" : "Pause simulation"} onClick={p.onPause} pressed={p.paused} shortcut="Space" />
         <CtlButton icon={p.muted ? "mute" : "sound"} label={p.muted ? "Unmute sound" : "Mute sound"} onClick={p.onMute} pressed={p.muted} shortcut="M" />
@@ -177,8 +186,8 @@ export function TelemetrySummary() {
       </div>
       <dl className="tele-grid">
         <div><dt>Voltage</dt><dd>{s.gotCurrent ? <Reading value={String(s.voltage)} unit="V" /> : "—"}</dd></div>
-        <div className={`tone-${c.tone}`}><dt>Current <i aria-hidden="true">●</i><span className="sr-only">{c.label}</span></dt><dd>{s.gotCurrent ? <Reading value={rawToAmps(s.latestCurrent).toFixed(1)} unit="A" /> : "—"}</dd></div>
-        <div className={`tone-${t.tone}`}><dt>Temperature <i aria-hidden="true">●</i><span className="sr-only">{t.label}</span></dt><dd>{s.gotTemp ? <Reading value={rawToDegC(s.latestTemp).toFixed(1)} unit="°C" /> : "—"}</dd></div>
+        <div key={`c-${c.tone}`} className={`tone-${c.tone}`}><dt>Current <i aria-hidden="true">●</i><span className="sr-only">{c.label}</span></dt><dd>{s.gotCurrent ? <Reading value={rawToAmps(s.latestCurrent).toFixed(1)} unit="A" /> : "—"}</dd></div>
+        <div key={`t-${t.tone}`} className={`tone-${t.tone}`}><dt>Temperature <i aria-hidden="true">●</i><span className="sr-only">{t.label}</span></dt><dd>{s.gotTemp ? <Reading value={rawToDegC(s.latestTemp).toFixed(1)} unit="°C" /> : "—"}</dd></div>
       </dl>
       {lastFrame && (
         <div className="tele-foot">

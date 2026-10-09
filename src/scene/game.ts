@@ -13,15 +13,41 @@ import { ANCHORS, AMBER_LAMP, BEACON, NAME_BY_OBJ, NODES, OBJ, OBJ_BY_NAME, ORIG
 import { createRoomDecals, drawDecal, type Decal } from "./decals";
 import { drawChair, Operator, type Facing } from "./operator";
 import { PAL } from "./palette";
-import { LOGICAL_H, LOGICAL_W, QUALITY_SCALE, Raster, toABGR, type Quality } from "./raster";
+import { LOGICAL_H, LOGICAL_W, QUALITY_SCALE, Raster, hash2, toABGR, type Quality } from "./raster";
 import { buildStatic, drawBackgroundLeds, drawMonitor, drawRackDynamic, type RackLook } from "./world";
+
+/** Scene sounds that come from animation rather than from the controller. */
+export type SceneCue = "step" | "chair";
 
 export interface GameCallbacks {
   onHover(target: Interactive | null): void;
   onActivate(target: Interactive): void;
   /** The renderer stepped quality down because frames were too slow. */
   onQualityFallback?(to: Quality): void;
+  onCue?(cue: SceneCue): void;
 }
+
+/**
+ * Room mood, eased toward the controller state every frame so lighting changes are felt rather
+ * than read: alarms rise quickly, recovery fades out in slow stages.
+ */
+interface Mood {
+  warm: number;
+  crit: number;
+  /** P6 current warning without a trip. */
+  current: number;
+  /** Current above the trip level. */
+  trip: number;
+  epo: number;
+  /** UART link indicator. */
+  link: number;
+}
+
+/** The director uses centred framings; the plain ones leave room for an inspection panel. */
+const INCIDENT_FRAMING: Partial<Record<FocusName, FocusName>> = { rack: "incidentRack", desk: "incidentDesk", button: "incidentButton" };
+
+/** Seconds a followed incident framing is held before the next one may replace it. */
+const FOLLOW_HOLD_S = 2.2;
 
 interface AnchorReg {
   el: HTMLElement;
@@ -32,6 +58,8 @@ interface AnchorReg {
 }
 
 interface Pulse { t: number; dir: 1 | -1; color: number; reply?: number }
+/** A rejected packet bursting at the controller end of the cable tray. */
+interface Burst { t: number }
 
 const PATH_LEN = (() => {
   const segs: number[] = [];
@@ -80,6 +108,19 @@ export class Game {
   private fanAngle = 0;
   private flashT = 0;
   private pulses: Pulse[] = [];
+  private bursts: Burst[] = [];
+  private mood: Mood = { warm: 0, crit: 0, current: 0, trip: 0, epo: 0, link: 0 };
+  private beaconAngle = 0;
+  private glitchT = 0;
+  /** Incident-following camera: on by default, never under reduced motion. */
+  follow = true;
+  /** A panel the user opened owns the camera; the director stays out of the way. */
+  private userLock = false;
+  private followUntil = 0;
+  private followNext: FocusName | null = null;
+  private autoReturnAt = -1;
+  private wasStreaming = true;
+  private frameHooks = new Set<() => void>();
   private hover: number = OBJ.NONE;
   private focusRing: number = OBJ.NONE;
   private anchors = new Map<HTMLElement, AnchorReg>();
@@ -109,10 +150,12 @@ export class Game {
       onPressDown: () => this.rt.buttonDown(true),
       onPressUp: () => {
         this.rt.buttonUp();
-        if (this.camera.focus === "button") this.returnToRoomAt = this.time + 1.8;
+        if (this.camera.focus === "button" || this.camera.focus === "incidentButton") this.returnToRoomAt = this.time + 1.8;
       },
       onRelease: () => this.rt.buttonUp(),
       isHeld: () => this.rt.p0Down,
+      onStep: () => this.cb.onCue?.("step"),
+      onChair: () => this.cb.onCue?.("chair"),
     });
 
     // The scene's operator is the runtime's agent: manual clicks and scenario acknowledgements
@@ -121,33 +164,56 @@ export class Game {
     rt.agent = {
       pressReset: () => {
         if (this.observer) op.teleport("button");
-        if (!this.observer) this.setFocus("button");
+        this.direct("button", true);
         op.pressButton();
       },
       cancel: () => op.cancel(),
       returnToDesk: () => {
         if (this.observer) op.teleport("seat");
-        else op.goToDesk();
-        if (this.camera.focus === "button") this.setFocus("room");
+        else op.goToDesk(true);
+        if (this.camera.focus === "button" || this.camera.focus === "incidentButton") this.setFocus("room");
       },
       get busy() {
         return op.busy;
       },
     };
 
+    // Incident choreography: every reaction below follows a real controller event.
     const bus = rt.bus;
     this.unsubs.push(
       bus.on("telemetry", ({ result }) => {
         if (!this.reducedMotion) this.pulses.push({ t: 0, dir: 1, color: PAL.pulse, reply: result.reply[0] });
+        if (result.outcome === "bad-crc" || result.outcome === "invalid") {
+          this.glitchT = 0.8;
+          // look at the terminal that sent it, then back to whatever is still wrong
+          this.direct("desk", true);
+          this.followNext = this.rt.controller.state.epo ? "rack" : "room";
+        }
       }),
       bus.on("trip", () => {
         this.flashT = 1.2;
         if (!this.reducedMotion) this.camera.emphasize();
         this.operator.notice();
+        if (!this.observer) this.operator.respond();
+        this.direct("rack", true);
       }),
-      bus.on("warning", () => this.operator.notice()),
+      bus.on("warning", () => {
+        this.operator.notice();
+        this.direct("rack");
+      }),
       bus.on("scenario", ({ phase }) => {
-        if (phase === "start" && !this.reducedMotion) this.camera.emphasize();
+        if (phase === "start") {
+          if (!this.reducedMotion) this.camera.emphasize();
+          this.direct("room", true);
+        } else {
+          // finished: hold the last framing a moment, then show the whole room again
+          this.followUntil = this.time + 1.5;
+          this.followNext = "room";
+        }
+      }),
+      bus.on("reset", ({ outcome }) => {
+        // free play: nobody coordinates the recovery, so the operator checks the rack and goes back
+        if (outcome === "accepted" && this.rt.recovery.phase === "idle") this.autoReturnAt = this.time + 2.2;
       }),
       bus.on("state", (s) => {
         const calm = !s.epo && s.tempClass === TEMP_CLASS.NORMAL && !s.overload;
@@ -155,7 +221,12 @@ export class Game {
       }),
       bus.on("restart", () => {
         this.pulses = [];
+        this.bursts = [];
         this.flashT = 0;
+        this.glitchT = 0;
+        this.autoReturnAt = -1;
+        this.followNext = null;
+        this.followUntil = 0;
       }),
     );
 
@@ -236,6 +307,41 @@ export class Game {
     this.reducedMotion = on;
     this.operator.speedScale = on ? 2 : 1;
     if (on) this.pulses = [];
+  }
+
+  /** "Follow incident": the camera frames whatever the current event is about. */
+  setFollow(on: boolean): void {
+    this.follow = on;
+    if (!on) this.followNext = null;
+  }
+
+  /** A user-opened panel owns the camera while it is open. */
+  setInteractionLock(on: boolean): void {
+    this.userLock = on;
+    if (on) this.followNext = null;
+  }
+
+  /** Run `fn` every frame after the camera moves (DOM overlays such as leader lines). */
+  onFrame(fn: () => void): () => void {
+    this.frameHooks.add(fn);
+    return () => this.frameHooks.delete(fn);
+  }
+
+  /**
+   * Incident camera direction: frame `name`, holding each framing long enough to read. A
+   * request during the hold waits its turn unless `urgent`. Short eased moves (about half a
+   * second); nothing at all under reduced motion, in observer mode or while a panel is open.
+   */
+  private direct(name: FocusName, urgent = false): void {
+    if (!this.follow || this.reducedMotion || this.observer || this.userLock) return;
+    if (!urgent && this.time < this.followUntil) {
+      this.followNext = name;
+      return;
+    }
+    this.followNext = null;
+    this.followUntil = this.time + FOLLOW_HOLD_S;
+    this.returnToRoomAt = -1;
+    this.camera.setFocus(INCIDENT_FRAMING[name] ?? name);
   }
 
   setObserver(on: boolean): void {
@@ -331,7 +437,7 @@ export class Game {
   private frame = (now: number) => {
     if (this.hidden) return; // stop entirely while the tab is hidden
     this.raf = requestAnimationFrame(this.frame);
-    const dt = this.last ? Math.min(0.1, (now - this.last) / 1000) : 0;
+    const dt = this.last ? Math.max(0, Math.min(0.1, (now - this.last) / 1000)) : 0;
     this.last = now;
     const paused = this.rt.paused;
 
@@ -346,8 +452,22 @@ export class Game {
       this.operator.update(dt);
       if (this.returnToRoomAt > 0 && this.time >= this.returnToRoomAt && !this.operator.busy) {
         this.returnToRoomAt = -1;
-        if (this.camera.focus === "button") this.setFocus("room");
+        if (this.camera.focus === "button" || this.camera.focus === "incidentButton") this.setFocus("room");
       }
+      if (this.autoReturnAt > 0 && this.time >= this.autoReturnAt && !this.operator.busy) {
+        this.autoReturnAt = -1;
+        if (this.rt.recovery.phase === "idle" && !this.rt.controller.state.epo && this.operator.location !== "seat") {
+          this.operator.goToDesk(true);
+          this.direct("room", true);
+        }
+      }
+      // the link going silent is an event too: show the terminal that stopped sending
+      if (this.wasStreaming && !this.rt.streaming) {
+        this.direct("desk", true);
+        this.followNext = this.rt.controller.state.epo ? "rack" : null;
+      }
+      this.wasStreaming = this.rt.streaming;
+      if (this.followNext && this.time >= this.followUntil) this.direct(this.followNext);
     }
     const t0 = performance.now();
     this.render(paused ? 0 : dt);
@@ -355,6 +475,7 @@ export class Game {
     this.present(cam.cx, cam.cy, cam.zoom);
     this.watchPerformance(performance.now() - t0, dt);
     for (const a of this.anchors.values()) this.placeAnchor(a);
+    for (const fn of this.frameHooks) fn();
   };
 
   /** Step Sharp down to Balanced if rendering keeps exceeding the frame budget. */
@@ -390,15 +511,43 @@ export class Game {
       monitorEpo: s.epo,
       readings: { v: s.voltage, i: s.latestCurrent, t: s.latestTemp, got: s.gotTemp },
       linkSilent: !this.rt.streaming,
+      heartbeat: this.reducedMotion || this.time % 2.4 < 0.16 || (this.time % 2.4 > 0.34 && this.time % 2.4 < 0.48),
+      link: this.mood.link,
+      glitch: !this.reducedMotion && this.glitchT > 0 && Math.floor(this.glitchT * 12) % 2 === 0,
     };
   }
 
-  private render(dt: number): void {
+  /** Ease the room mood toward the controller state: quick to alarm, slow and staged to recover. */
+  private updateMood(dt: number): void {
     const s = this.rt.controller.state;
+    const trip = s.gotCurrent && s.latestCurrent > s.tripCurrent;
+    const target: Mood = {
+      warm: s.tempClass === TEMP_CLASS.WARM ? 1 : 0,
+      crit: s.tempClass === TEMP_CLASS.CRITICAL ? 1 : 0,
+      current: s.overload && !trip ? 1 : 0,
+      trip: trip ? 1 : 0,
+      epo: s.epo ? 1 : 0,
+      link: this.rt.streaming ? (this.pulses.length ? 1 : 0.5) : 0,
+    };
+    const m = this.mood;
+    for (const k of Object.keys(m) as (keyof Mood)[]) {
+      if (this.reducedMotion) m[k] = target[k];
+      else {
+        const rate = target[k] > m[k] ? 7 : k === "link" ? 3 : 0.9;
+        m[k] += (target[k] - m[k]) * (1 - Math.exp(-dt * rate));
+        if (Math.abs(target[k] - m[k]) < 0.004) m[k] = target[k];
+      }
+    }
+  }
+
+  private render(dt: number): void {
+    this.updateMood(dt);
     const L = this.look();
     const speed = [0.6, 1.7, 3.6][L.fanLevel] * (this.reducedMotion ? 0.35 : 1);
     this.fanAngle = (this.fanAngle + dt * speed * Math.PI * 2) % (Math.PI * 2);
     this.flashT = Math.max(0, this.flashT - dt);
+    this.glitchT = Math.max(0, this.glitchT - dt);
+    this.beaconAngle = (this.beaconAngle + dt * 2.8) % (Math.PI * 2);
 
     const r = this.work;
     const S = r.S;
@@ -410,39 +559,130 @@ export class Game {
       const [sx, sy] = r.project(x, y, 0);
       r.darken(sx, sy, radius * 1.41 * S, radius * 0.71 * S, k, OBJ.NONE);
     };
-    shadowAt(NODES.seat.x, NODES.seat.y, 7.5, 0.78);
+    const chairX = NODES.seat.x + op.chairRoll * 3.5; // rolled back while the operator is up
+    shadowAt(chairX, NODES.seat.y, 7.5, 0.78);
     if (op.pose !== "sit") shadowAt(op.x, op.y, 6, 0.72);
 
     // chair, Rack A moving parts, background idle LEDs, monitor, operator
     if (op.pose === "sit") this.chairFacing = op.facing;
-    drawChair(r, NODES.seat.x, NODES.seat.y, this.chairFacing);
+    drawChair(r, chairX, NODES.seat.y, this.chairFacing);
     drawRackDynamic(r, L);
     drawBackgroundLeds(r, this.time, this.reducedMotion);
     drawMonitor(r, L);
     op.draw(r, this.time, this.reducedMotion);
+    if (!this.reducedMotion) this.drawAirflow(r, L.fanLevel);
 
-    // lights: hard-banded pools, no gradients
-    const [bx, by] = r.project(BEACON.x + 3, BEACON.y + 3, 86);
-    if (s.epo) r.lightPool(bx, by + 12 * S, 58 * S, 34 * S, PAL.crit, L.flash ? 0.26 : 0.14, 3);
-    const [ax, ay] = r.project(AMBER_LAMP.x + 3, AMBER_LAMP.y + 3, 84);
-    if (s.overload) r.lightPool(ax, ay + 6 * S, 40 * S, 22 * S, PAL.warn, 0.13, 3);
-    if (s.tempClass === TEMP_CLASS.WARM) {
-      const [fx, fy] = r.project(100, 30, 30);
-      r.lightPool(fx, fy, 38 * S, 48 * S, PAL.warn, 0.07, 2);
-    }
-    const [mx, my] = r.project(12, 76, 38);
-    const monColor = L.monitorState === "crit" ? PAL.crit : L.monitorState === "warn" ? PAL.warn : 0x6fa8c8;
-    r.lightPool(mx + 6 * S, my + 6 * S, 30 * S, 18 * S, monColor, 0.07, 2);
+    this.drawLights(r, L);
 
-    // UART pulses along the cable tray (outbound packet, then the reply)
+    // UART pulses along the cable tray (outbound packet, then the reply), and rejections
     if (this.pulses.length) this.drawPulses(r, dt);
+    if (this.bursts.length) this.drawBursts(r, dt);
 
-    // heat shimmer above the rack while the real (external) temperature is above 32.0 °C
-    if (!this.reducedMotion && this.rt.conditions.tempRaw > 64) this.shimmer(r);
+    // exhaust shimmer above the rack from the real (external) temperature: faint when Warm
+    const tempRaw = this.rt.conditions.tempRaw;
+    if (!this.reducedMotion && tempRaw >= 54) this.shimmer(r, tempRaw > 64 ? 1.2 : 0.55);
 
     // hover / keyboard focus outline
     const hl = this.focusRing || this.hover;
     if (hl) r.outline(hl, PAL.highlight, this.outlineMarks);
+  }
+
+  /**
+   * State-reactive lighting, all hard-banded pools: cool overhead light in normal operation,
+   * amber near Rack 01 when Warm, a sweeping red beacon and red floor reflections while the EPO
+   * request is latched, amber at the current lamp, red rack-edge light on a current trip.
+   * Pools scale with the eased mood, so recovery fades in stages instead of switching off.
+   */
+  private drawLights(r: Raster, L: RackLook): void {
+    const S = r.S, m = this.mood;
+    const pool = (x: number, y: number, z: number, rx: number, ry: number, rgb: number, k: number, bands = 3, onlyId = -1) => {
+      if (k < 0.004) return;
+      const [px, py] = r.project(x, y, z);
+      r.lightPool(px, py, rx * S, ry * S, rgb, k, bands, onlyId);
+    };
+    // overhead fixtures: cool pools, dimmed under an alarm, with a barely visible fluorescent waver
+    const alarm = Math.max(m.epo, m.crit);
+    const waver = this.reducedMotion ? 1 : 1 + (hash2(Math.floor(this.time * 7), 3, 77) - 0.5) * 0.08;
+    const cool = 0.055 * (1 - 0.6 * alarm) * waver;
+    pool(34, 16, 0, 34, 16, PAL.coolLight, cool, 2);
+    pool(134, 16, 0, 28, 14, PAL.coolLight, cool * 0.9, 2);
+
+    // Warm: amber near the rack
+    pool(100, 30, 30, 38, 48, PAL.warn, 0.08 * m.warm, 2);
+    // Critical: red reflected on the cooling tiles in front of the rack
+    pool(102, 38, 0, 30, 14, PAL.crit, 0.07 * m.crit, 2);
+    // EPO latched: beacon glow plus a sweep across the floor (static under reduced motion)
+    if (m.epo > 0.004) {
+      const [bx, by] = r.project(BEACON.x + 3, BEACON.y + 3, 86);
+      r.lightPool(bx, by + 12 * S, 58 * S, 34 * S, PAL.crit, (L.flash ? 0.26 : 0.14) * m.epo, 3);
+      if (this.reducedMotion) pool(103, 40, 0, 26, 13, PAL.crit, 0.06 * m.epo, 2);
+      else pool(103 + Math.cos(this.beaconAngle) * 30, 42 + Math.sin(this.beaconAngle) * 16, 0, 22, 11, PAL.crit, 0.11 * m.epo, 2);
+    }
+    // P6 current warning: the amber lamp lights its surroundings
+    pool(AMBER_LAMP.x + 3, AMBER_LAMP.y + 3, 78, 40, 22, PAL.warn, 0.13 * Math.max(m.current, m.trip), 3);
+    // current trip: red light along Rack 01's own edges
+    pool(100, 26, 40, 34, 52, PAL.crit, 0.12 * m.trip, 3, OBJ.RACK);
+
+    // DCIM monitor spill (brighter while a rejected packet tears the display)
+    const monColor = L.monitorState === "crit" ? PAL.crit : L.monitorState === "warn" ? PAL.warn : 0x6fa8c8;
+    const [mx, my] = r.project(12, 76, 38);
+    r.lightPool(mx + 6 * S, my + 6 * S, 30 * S, 18 * S, L.glitch ? PAL.warn : monColor, L.glitch ? 0.11 : 0.07, 2);
+
+    // a small reflection slides down Rack 01's front edge every few seconds
+    const g = (this.time % 9) / 1.8;
+    if (!this.reducedMotion && g < 1) pool(114, 25, 82 - g * 80, 2.5, 6, 0xffffff, 0.14, 2, OBJ.RACK);
+  }
+
+  /** Cool air drawn up from the perforated tiles into Rack 01's intake; faster with fan boost. */
+  private drawAirflow(r: Raster, fanLevel: number): void {
+    const speed = [0.22, 0.4, 0.62][fanLevel];
+    const size = Math.max(1, Math.round(r.S * 0.6));
+    for (let i = 0; i < 16; i++) {
+      const life = (this.time * speed + hash2(i, 3, 5)) % 1;
+      const x = 87 + hash2(i, 1, 5) * 26;
+      const y = 30 + hash2(i, 2, 5) * 18 - life * 7;
+      const z = life * 20;
+      const [sx, sy] = r.project(x, y, z);
+      const depth = x + y + z;
+      const k = 0.32 * (1 - life);
+      for (let oy = 0; oy < size; oy++)
+        for (let ox = 0; ox < size; ox++) {
+          const px = Math.floor(sx) + ox, py = Math.floor(sy) + oy;
+          if (px < 0 || py < 0 || px >= r.w || py >= r.h) continue;
+          const j = py * r.w + px;
+          if (r.depth[j] > depth + 1) continue;
+          const c = r.color[j];
+          // ImageData is ABGR: blend each channel toward the cool tint
+          const tint = PAL.coolLight;
+          const cr = (c & 255) + (((tint >> 16) & 255) - (c & 255)) * k;
+          const cg = ((c >> 8) & 255) + (((tint >> 8) & 255) - ((c >> 8) & 255)) * k;
+          const cb = ((c >> 16) & 255) + ((tint & 255) - ((c >> 16) & 255)) * k;
+          r.color[j] = (0xff000000 | (Math.round(cb) << 16) | (Math.round(cg) << 8) | Math.round(cr)) >>> 0;
+        }
+    }
+  }
+
+  /** A rejected packet bursts at the controller end of the tray before its reply returns. */
+  private drawBursts(r: Raster, dt: number): void {
+    const S = r.S;
+    const [x, y, z] = pathPoint(1);
+    const [cx, cy] = r.project(x, y, z);
+    const col = toABGR(PAL.warn);
+    let n = 0;
+    for (const b of this.bursts) {
+      b.t += dt / 0.5;
+      if (b.t < 1) this.bursts[n++] = b;
+    }
+    this.bursts.length = n;
+    for (const b of this.bursts) {
+      const rad = (1.5 + b.t * 5) * S;
+      for (let a = 0; a < 20; a++) {
+        if ((a + Math.floor(b.t * 6)) % 2) continue; // broken ring
+        const px = Math.round(cx + Math.cos((a / 20) * Math.PI * 2) * rad);
+        const py = Math.round(cy + Math.sin((a / 20) * Math.PI * 2) * rad * 0.6);
+        if (px >= 0 && py >= 0 && px < r.w && py < r.h) r.color[py * r.w + px] = col;
+      }
+    }
   }
 
   private drawPulses(r: Raster, dt: number): void {
@@ -451,7 +691,11 @@ export class Game {
     for (const p of this.pulses) {
       p.t += dt / 0.45;
       if (p.t >= 1) {
-        if (p.dir === 1 && p.reply !== undefined) this.pulses[n++] = { t: 0, dir: -1, color: p.reply === 0xa5 ? PAL.pulse : PAL.warn };
+        if (p.dir === 1 && p.reply !== undefined) {
+          const ok = p.reply === 0xa5;
+          if (!ok) this.bursts.push({ t: 0 });
+          this.pulses[n++] = { t: 0, dir: -1, color: ok ? PAL.pulse : PAL.warn };
+        }
       } else this.pulses[n++] = p;
     }
     this.pulses.length = n;
@@ -472,14 +716,14 @@ export class Game {
     }
   }
 
-  private shimmer(r: Raster): void {
+  private shimmer(r: Raster, amp: number): void {
     const S = r.S, W = r.w;
     const [x0] = r.project(86, 26, 80);
     const [x1] = r.project(114, 0, 80);
     const [, top] = r.project(100, 12, 90);
     const row = this.shimmerRow;
     for (let y = Math.max(0, Math.floor(top - 34 * S)); y < Math.floor(top - 4 * S); y++) {
-      const shift = Math.round(Math.sin(this.time * 7 + (y / S) * 0.9) * 1.2 * S);
+      const shift = Math.round(Math.sin(this.time * 7 + (y / S) * 0.9) * amp * S);
       if (!shift) continue;
       const off = y * W;
       row.set(r.color.subarray(off, off + W));

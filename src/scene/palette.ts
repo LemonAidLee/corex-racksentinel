@@ -97,4 +97,16 @@ export const PAL = {
   lampOff: 0x2b2f34,
 
   highlight: 0xf3ecd2,
+
+  // environment details
+  edgeLight: 0x3b5266, // floor-edge strip, cool and dim
+  zonePaint: 0x6f8faa, // Rack 01 service-zone floor paint
+  safetyYellow: 0xd9bf3f, // physical hazard marking, not a state colour
+  blueprint: 0x22344a,
+  blueprintInk: 0x9cc0dc,
+  clipboard: 0x6b5843,
+  paper: 0xd6dade,
+  extinguisher: 0x7a3a36, // muted, so it never reads as an alarm
+  conduit: 0x6a737c,
+  coolLight: 0x9fc4e0,
 } as const;

@@ -2,7 +2,7 @@
 import { LOGICAL_H as BUF_H, LOGICAL_W as BUF_W } from "./raster";
 import { projectLogical as P } from "./layout";
 
-export type FocusName = "room" | "rack" | "desk" | "button" | "observer";
+export type FocusName = "room" | "rack" | "desk" | "button" | "observer" | "incidentRack" | "incidentDesk" | "incidentButton";
 
 export interface CamPose { cx: number; cy: number; zoom: number }
 
@@ -22,6 +22,11 @@ export const FOCUS: Record<FocusName, CamPose> = {
   button: frame(121, 13, 32, 36, -14, 1.5),
   desk: frame(9, 76, 52, 29, 40, 1.2),
   observer: frame(100, 12, 40, -4, -8, 3.4),
+  // incident following: no panel is open, so the subject stays centred and slightly wider,
+  // leaving the HUD corners clear
+  incidentRack: frame(104, 14, 44, -6, 6, 1.22),
+  incidentDesk: frame(14, 76, 44, -12, 18, 1.18),
+  incidentButton: frame(118, 18, 34, -10, 6, 1.3),
 };
 
 /**
