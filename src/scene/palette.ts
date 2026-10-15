@@ -99,6 +99,7 @@ export const PAL = {
   highlight: 0xf3ecd2,
 
   // environment details
+  water: 0x3c7fc4, // leak sensor puddle
   edgeLight: 0x3b5266, // floor-edge strip, cool and dim
   zonePaint: 0x6f8faa, // Rack 01 service-zone floor paint
   safetyYellow: 0xd9bf3f, // physical hazard marking, not a state colour

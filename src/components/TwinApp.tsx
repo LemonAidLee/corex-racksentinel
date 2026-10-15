@@ -9,13 +9,13 @@ import { GameContext, RuntimeContext } from "./context";
 import { Brand, ControlBar, LiveRegion, PrimaryStatus, PromptBar, TelemetrySummary, Toasts } from "./hud/Hud";
 import { QUALITY_LABEL, type Quality } from "@/scene/raster";
 import { readQuality, saveQuality } from "@/lib/quality";
-import { DEMO_WIDTH, DOCK_GAP, DemoBar, RAIL_WIDTH, SHEET_WIDTH, ScenarioDrawer, StageMini } from "./hud/ScenarioDrawer";
+import { DOCK_GAP, RAIL_WIDTH, SHEET_WIDTH, ScenarioDrawer, StageMini } from "./hud/ScenarioDrawer";
 import { ButtonChip, RackChip, RackHoverCard, RackInspector, TerminalChip } from "./panels/RackPanels";
 import { TerminalPanel } from "./panels/TerminalPanel";
 import { HelpDialog, SceneDescription } from "./panels/HelpDialog";
 import { ObserverPanel } from "./Observer";
 import { Icon } from "./icons";
-import { CausalityRibbon, DemoCaption, EvidencePanel, FocusLabels, ReplayButton, ScreenshotPresets, TimelineDrawer, type ShotPreset } from "./hud/Incident";
+import { CausalityRibbon, DemoStrip, EvidencePanel, FocusLabels, ReplayButton, ScreenshotPresets, TimelineDrawer, type ShotPreset } from "./hud/Incident";
 import type { FocusName } from "@/scene/camera";
 
 type Panel = "rack" | "terminal" | null;
@@ -305,13 +305,16 @@ export default function TwinApp() {
   };
   const ringOff = () => game?.setFocusRing(null);
   const demoActive = demoIndex >= 0;
-  // the right dock (scenarios or demo text) is hidden while the rack inspector or evidence uses that side
-  const dockVisible = !observer && !screenshot && panel !== "rack" && !evidence;
-  const dockOpen = dockVisible && (drawer || demoActive);
+  // what the audience should be looking at this beat; everything else in the HUD steps back
+  const anchor = demoActive ? DEMO_BEATS[demoIndex]?.anchor : undefined;
+  // the scenario rail is hidden while the rack inspector or evidence uses that side, and during the
+  // demo, where the story owns the bottom of the screen and the scene gets the full width
+  const dockVisible = !observer && !screenshot && panel !== "rack" && !evidence && !demoActive;
+  const dockOpen = dockVisible && drawer;
   // the scene keeps clear of the rail always, and of the sheet or demo text while they show
   // evidence docks on the right (CSS: min(480px, 36vw), at least 360px wide)
   const evidenceInset = evidence && !observer && !screenshot && panel !== "rack" ? Math.max(360, Math.min(480, window.innerWidth * 0.36)) + 32 : 0;
-  const dockInset = evidenceInset ? evidenceInset : !dockVisible ? 0 : demoActive ? DEMO_WIDTH + 32 : RAIL_WIDTH + 24 + (drawer ? SHEET_WIDTH + DOCK_GAP : 0);
+  const dockInset = evidenceInset ? evidenceInset : !dockVisible ? 0 : RAIL_WIDTH + 24 + (drawer ? SHEET_WIDTH + DOCK_GAP : 0);
   useEffect(() => {
     game?.setViewInset(dockInset);
   }, [game, dockInset]);
@@ -319,7 +322,7 @@ export default function TwinApp() {
   return (
     <RuntimeContext.Provider value={rt}>
       <GameContext.Provider value={game}>
-        <main className={`twin ${screenshot ? "is-screenshot" : ""} ${presenting ? "is-presenting" : ""} ${observer ? "is-observer" : ""} ${focusing ? "is-focusing" : ""} ${reducedMotion ? "is-reduced" : ""}`} onPointerDown={() => soundRef.current?.unlock()}>
+        <main className={`twin ${screenshot ? "is-screenshot" : ""} ${presenting ? "is-presenting" : ""} ${observer ? "is-observer" : ""} ${focusing ? "is-focusing" : ""} ${reducedMotion ? "is-reduced" : ""} ${demoActive ? "is-demo" : ""}`} data-anchor={anchor} onPointerDown={() => soundRef.current?.unlock()}>
           <div className="stage">
             <canvas ref={canvasRef} className="scene" aria-hidden="true" />
             {canvasFailed && (
@@ -399,16 +402,12 @@ export default function TwinApp() {
               )}
               {dockVisible && (
                 <div className={`hud hud-dock ${dockOpen ? "is-open" : ""}`}>
-                  {demoActive ? (
-                    <DemoBar index={demoIndex} onPrev={demoPrev} onNext={demoNext} onExit={exitDemo} />
-                  ) : (
-                    <ScenarioDrawer open={drawer} onToggle={setDrawer} onPlay={playScenario} />
-                  )}
+                  <ScenarioDrawer open={drawer} onToggle={setDrawer} onPlay={playScenario} />
                 </div>
               )}
               <div className="hud hud-bc">
-                {demoActive && <DemoCaption index={demoIndex} />}
-                <CausalityRibbon large={presenting} />
+                <CausalityRibbon large={presenting} hold={demoActive} generation={demoIndex} />
+                {demoActive && <DemoStrip index={demoIndex} onPrev={demoPrev} onNext={demoNext} onExit={exitDemo} />}
                 <StageMini />
               </div>
               {panel !== "rack" && <div className="hud hud-br"><TelemetrySummary /></div>}

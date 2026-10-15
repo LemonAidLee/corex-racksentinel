@@ -8,14 +8,13 @@
  *
  * Phases:
  *   idle        not armed (free play, or a scenario with nothing to acknowledge)
- *   waiting     armed; readings not yet safe, P0 held, or the operator is busy
- *   safe        safe readings with the EPO still latched; held for `dwell` ms so it is visible
+ *   waiting     armed; a trip cause remains, P0 held, or the operator is busy
+ *   safe        reset would be accepted with the power-off still latched; held for `dwell` ms
  *   dispatched  the operator is on the way to P0 / pressing it
  *   cleared     the EPO request was cleared by a P0 press; result held on screen
  *   done        operator sent back to the desk; the scenario may complete
  */
-import { TEMP_CLASS } from "./controller";
-import type { ResetOutcome } from "./controller";
+import { resetBlockers, type ResetOutcome } from "./controller";
 import type { SimulationRuntime } from "./runtime";
 
 export type RecoveryPhase = "idle" | "waiting" | "safe" | "dispatched" | "cleared" | "done";
@@ -58,10 +57,10 @@ export class RecoveryCoordinator {
     this.update();
   }
 
-  /** Latched, Normal temperature, current below warning, a valid reading, P0 not held. */
+  /** Latched, a valid reading, every trip cause gone (below Critical, no runaway, dry, no fault), P0 not held. */
   safeToAcknowledge(): boolean {
     const s = this.rt.controller.state;
-    return s.epo && s.gotTemp && s.tempClass === TEMP_CLASS.NORMAL && s.latestCurrent < s.warnCurrent && !this.rt.p0Down;
+    return s.epo && s.gotTemp && resetBlockers(s, false).length === 0 && !this.rt.p0Down;
   }
 
   private get operatorBusy(): boolean {
@@ -90,8 +89,8 @@ export class RecoveryCoordinator {
           this.safeSince = now;
           rt.setStage(
             rt.streaming
-              ? { title: "Safe telemetry received · EPO still latched", detail: "Waiting for operator acknowledgement at P0.", tone: "warn" }
-              : { title: "Link silent · EPO still latched", detail: "Last readings are safe. P0 works locally without new telemetry.", tone: "warn" },
+              ? { title: "Safe to reset · power-off still latched", detail: "Waiting for operator acknowledgement at P0.", tone: "warn" }
+              : { title: "Link silent · power-off still latched", detail: "Safe to reset. P0 works locally without telemetry.", tone: "warn" },
           );
           return;
         }
@@ -141,7 +140,7 @@ export class RecoveryCoordinator {
 
   /** The operator pressed P0 (button went down). */
   onOperatorPress(): void {
-    if (this.phase === "dispatched") this.rt.setStage({ title: "Operator pressing P0", detail: "New press: the controller checks temperature and current.", tone: "info" });
+    if (this.phase === "dispatched") this.rt.setStage({ title: "Operator pressing P0", detail: "New press: the controller checks every trip cause again.", tone: "info" });
   }
 
   private toCleared(): void {
@@ -151,6 +150,6 @@ export class RecoveryCoordinator {
     this.awaitingPress = false;
     this.phase = "cleared";
     this.clearedAt = this.rt.time;
-    this.rt.setStage({ title: "EPO request cleared", detail: "Reset accepted: a new P0 press with safe readings.", tone: "ok" });
+    this.rt.setStage({ title: "Power-off cleared", detail: "Reset accepted: a new P0 press with every cause gone.", tone: "ok" });
   }
 }

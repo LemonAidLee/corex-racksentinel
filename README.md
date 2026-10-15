@@ -1,16 +1,25 @@
 # RackSentinel Digital Twin
 
-An interactive, single-page behavioural digital twin of **RackSentinel**, the RISC-V rack safety controller in this repository. The page opens straight into a pixel-art operator room: an operator at a DCIM terminal, a row of three server racks, and a physical P0 reset button. Only the rack nearest the desk (Rack 01) is controlled by RackSentinel: it carries the P4–P7 indicators, the P0 station and the UART run. The two racks beside it are background equipment with no readings, controls or connection to the controller.
+An interactive behavioural digital twin of **RackSentinel v2**, the RISC-V rack safety controller that runs on the AWS FPGA (`../stage4_fpga/`). The main page opens straight into a pixel-art operator room: an operator at a DCIM terminal, a row of three server racks, a leak sensor on the floor and a physical P0 reset button. Only the rack nearest the desk (Rack 01) is controlled by RackSentinel. Two explainer pages sit beside it:
 
-> **Simulation only.** The page is not connected to a physical rack or a live FPGA. Rack conditions and telemetry are simulated. The controller behaviour is a model of the submitted firmware, tested against the official cases. Fan spin, lamps and the beacon only illustrate output commands. P7 is an **EPO request** output, not a power disconnect.
+| Route | Page |
+|---|---|
+| `/` | The twin: the operator room, scenarios, guided demo, DCIM terminal |
+| `/features` | Eleven feature cards: in plain words, why it matters, why it stands out, with live mini-demos |
+| `/data-flow` | Each test case byte by byte: packets, the `crcb` CRC trace, firmware decisions, replies, pins, and the FPGA screenshot. Deep links: `/data-flow#R5` |
+
+> **Simulation only.** The pages are not connected to a physical rack or a live FPGA. Rack conditions and telemetry are simulated. The controller is a byte-level model of the v2 firmware, checked against the nine runs that passed on the AWS FPGA and 1,000 cases replayed on the RTL. Fan spin, lamps and the beacon only illustrate output commands. P7 is a **power-off request**, not a disconnect.
 
 ## What it demonstrates
 
-- Temperature classes: Normal below 27.0 °C, Warm from 27.0 °C through 32.0 °C (P4 Fan Boost), Critical above 32.0 °C (P5 Maximum Fan and a latched P7 EPO request).
-- Current: Warning at 25.6 A and above (P6), trip above 32.0 A (P6 and a latched P7).
-- The EPO request **stays latched**. Safe readings alone never clear it. Only a **new** P0 press clears it, and only when temperature is Normal and current is below 25.6 A. A held button can't clear a later trip.
-- Invalid readings (reply `0x3C`) and bad CRCs (reply `0x5A`) change nothing. Voltage is validated and stored, but it never triggers protection.
-- If telemetry stops, the controller keeps its last state, and P0 still works locally.
+- **Temperature classes** (ASHRAE): Warm from 27.0 °C (P4 fan boost), Hot from 32.0 °C (P5 fans at maximum), Critical from 35.0 °C (P5 + P7 power-off, latched). A reading on a threshold takes the higher class.
+- **Thermal runaway**: a rise of 2.0 °C or more between two readings latches P7 before any threshold.
+- **Water leak** on P1: latches P7 with no message on the link.
+- **Power = V × I** with a 5.9 kW limit: the P6 overload alarm follows the reading and never cuts power. **Energy** is metered in Wh.
+- **ECC on the settings**: one flipped bit is repaired at the next use; two make the setting unreadable and latch P7 until the DCIM rewrites it.
+- **Trip record** (cause, temperature, current), **STATUS** and **COUNTERS**.
+- The latch clears only on a **new** P0 press once every cause is gone: below Critical, no runaway on the latest reading, leak sensor dry, no unreadable setting. A held button never clears it.
+- Bad CRC (`5A`) and invalid values (`3C`) change nothing.
 
 ## Using it
 
@@ -18,9 +27,9 @@ An interactive, single-page behavioural digital twin of **RackSentinel**, the RI
 |---|---|
 | Inspect the rack | Click the rack (or Tab to **RACK 01** and press Enter) |
 | Press P0 | Click the reset button on the rack's side, or **P0 RESET**. The operator walks over and presses it |
-| Change conditions / send packets | Click the DCIM terminal: sliders use real step sizes (1 V, 0.2 A, 0.5 °C), plus presets, a corrupted-CRC packet and an invalid reading |
-| Scenarios | **Scenarios** rail at the middle right: pick a category (Rack, Power, Reset, Comms) and its scenarios slide out beside it, with the room re-centring alongside. 13 scripted, deterministic scenarios, each tagged with the official case it demonstrates. Each one shows the fault, then a simulated **external** recovery (new telemetry from the DCIM), and, when an EPO request is latched, the operator walks over and makes a new P0 press once readings are safe. The prompt bar says what each phase shows |
-| Guided demo | **Guided demo** button in the toolbar or `G`; the step text appears at the middle right. Use `←` / `→` to step through it |
+| Change conditions / send packets | Click the DCIM terminal. **Readings**: temperature and current sliders (0.5 °C and 0.2 A steps) that walk gradually by default, presets, a cooling-failure jump, the leak sensor, a damaged packet and a raw-0 reading. **Commands**: STATUS, ENERGY, COUNTERS, TRIP_INFO, the six settings and the ECC self-test |
+| Scenarios | **Scenarios** rail at the middle right, in four categories (Heat, Water, ECC, Reset). Thirteen deterministic scenarios tell Ali's day as an operator: nine match the FPGA runs R1 to R9 one to one (tagged "FPGA run R3" …), four are extras. Each shows the fault, then a simulated **external** recovery, and, when the power-off is latched, the operator walks over and presses P0 once a reset would be accepted |
+| Guided demo | **Guided demo** button in the toolbar or `G`: Ali's shift in eleven steps (warm, hot, critical, refused and accepted reset, leak, a two-bit memory fault). Use `←` / `→` to step |
 
 The room renders at three quality levels, chosen in the toolbar and remembered in the browser:
 
@@ -40,8 +49,8 @@ On phones the page switches to a simplified observer view: a rack close-up, read
 
 - **Room vs interface.** The room is pixel art and voxels; text painted in the room (P0, P4–P7, rack and terminal labels) uses the Silkscreen pixel font. Everything that belongs to the website (buttons, status, alerts, panels, help) is set in IBM Plex Sans, with measurements, raw values and protocol codes in IBM Plex Mono with tabular figures.
 - **Colour.** Green, amber and red appear only for real controller states, and always next to an icon or shape. Steel blue is the neutral interface accent.
-- **Primary status** at the top answers three questions: the rack condition, whether the EPO request is latched, and whether a P0 reset is available or blocked (and why).
-- **Icons.** Interface icons come from one family, [Phosphor](https://phosphoricons.com) (`@phosphor-icons/react`). The 13 scenario icons are original voxel art generated in `src/components/scenarios/scenarioIcons.ts`.
+- **Primary status** at the top answers three questions: the rack condition, whether the power-off is latched (and why), and whether a P0 reset is available or blocked (and why).
+- **Icons.** Interface icons come from one family, [Phosphor](https://phosphoricons.com) (`@phosphor-icons/react`). The scenario icons are original voxel art generated in `src/components/scenarios/scenarioIcons.ts`.
 
 ## Develop
 
@@ -70,12 +79,12 @@ Fonts (Silkscreen, IBM Plex Sans/Mono) are downloaded by `next/font` at build ti
 
 ## Testing against the project evidence
 
-`src/sim/controller.test.ts` replays every step of the official test cases **C01–C12** (`Equipe31_Submission_Files/TESTCASES_FINAL_C01-C12.md`, `testbench/tb_data_center_application.v`). It checks reply bytes, output pins and STATUS bytes, and checks every CRC against the verified `./emu` command lines. It also covers the 20 required behaviours: boundaries, independent and combined trips, latch persistence, refused resets, held P0, invalid telemetry, bad CRC, trip counting and no telemetry.
+`src/sim/controller.test.ts` replays every step of the nine `./emu` runs that passed on the AWS FPGA and of the 1,000 demo cases JX replayed on the RTL (`src/sim/__fixtures__/emu-golden.json`, generated from `../stage4_fpga/rack_demo.html`). Each line carries its own expected replies and pins, so a single wrong byte fails the test. It also checks CRC-16, every ECC single and double error, the energy division and the data-flow cases.
 
-`src/sim/runtime.test.ts` plays every scenario and the guided demo and checks their end states and determinism.
+`src/sim/runtime.test.ts` plays every scenario and the guided demo, checks their end states, the trip records they produce, and that the operator only presses P0 when a reset would be accepted. `src/sim/timeline.test.ts` checks the incident record, the causality chains and that every evidence check passes.
 
-## Relationship to the submission
+## Relationship to the project
 
-Nothing in the submitted RTL, firmware, testbenches, evidence or documentation was modified. The controller model (`src/sim/controller.ts`) is a TypeScript port of `firmware/firmware_application/main.s`, with comments naming the matching firmware labels.
+The controller model (`src/sim/controller.ts`) is a port of the v2 firmware model in `stage4_fpga/rack_demo.html`, with comments naming the firmware routines (`cfg_get`, `epo_trip`, `check_inputs`, `update_outputs`). Nothing in the submitted RTL, firmware or evidence was modified. The FPGA screenshots used by `/data-flow` and `/features` are copies of `stage4_fpga/evidence/` in `public/evidence/`.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the system layout and for how to add technical panels.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the system layout.

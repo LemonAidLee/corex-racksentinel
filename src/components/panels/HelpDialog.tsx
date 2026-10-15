@@ -2,8 +2,8 @@
 import { useEffect, useRef } from "react";
 import { useSim } from "../context";
 import { Icon } from "../icons";
-import { currentInfo, epoInfo, fanInfo, PIN_LABELS, tempInfo } from "@/lib/present";
-import { fmtAmps, fmtDegC, fmtVolts } from "@/sim/units";
+import { epoInfo, fanInfo, leakInfo, PIN_LABELS, powerInfo, tempInfo } from "@/lib/present";
+import { fmtAmps, fmtDegC, fmtKW } from "@/sim/units";
 
 /** Text alternative to the graphical scene, always current. */
 export function SceneDescription() {
@@ -13,11 +13,11 @@ export function SceneDescription() {
     <p className="scene-desc">
       An operator room with a monitoring desk, a DCIM terminal and a row of three server racks. Only the rack nearest the desk is
       connected to RackSentinel; the two racks beside it are background equipment with no readings or controls. The controlled
-      rack has four output lamps (P4 to P7), two fans, a red EPO request beacon, an amber current-warning lamp and a P0 reset
-      button on its side.{" "}
+      rack has four output lamps (P4 to P7), two fans, a red power-off beacon, an amber overload lamp, a leak sensor on the
+      floor in front of it and a P0 reset button on its side.{" "}
       {s.gotTemp
-        ? `Latest valid readings: ${fmtVolts(s.voltage)}, ${fmtAmps(s.latestCurrent)}, ${fmtDegC(s.latestTemp)}. Temperature ${tempInfo(s).label}, current ${currentInfo(s).label}, fans ${fanInfo(s).label}. `
-        : "No telemetry received yet. "}
+        ? `Latest readings: ${fmtDegC(s.latestTemp)}, ${fmtAmps(s.latestCurrent)}${s.power !== null ? `, ${fmtKW(s.power)}` : ""}. Temperature ${tempInfo(s).label}, power ${powerInfo(s).label}, fans ${fanInfo(s).label}, leak sensor ${leakInfo(s).label}. `
+        : "No readings received yet. "}
       {active.length ? `Active outputs: ${active.join(", ")}. ` : "No outputs active. "}
       {epoInfo(s).label}. {p0Down ? "P0 is held down. " : ""}
       {streaming ? "Telemetry is streaming." : "Telemetry is stopped."}
@@ -59,26 +59,30 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
           <section>
             <h3 className="section-label">What you are looking at</h3>
             <p>
-              RackSentinel is a RISC-V system-on-chip whose firmware guards one server rack. A DCIM terminal sends voltage, current and
-              temperature over UART; the controller decides locally and drives four outputs.
+              RackSentinel is a RISC-V system-on-chip whose firmware guards one server rack. A DCIM terminal sends temperature and
+              current over UART in 4-byte packets, a leak sensor sits on P1, and the controller decides locally and drives four outputs.
+              This twin models <b>v2</b>, the firmware that runs on the AWS FPGA.
             </p>
             <ul className="legend">
               <li><b>Simulated:</b> the room, the rack&apos;s conditions and the telemetry stream. Scenario recovery (cooling, load
                 falling) is an external change sent as new telemetry: P5 requests fans but never changes the reading itself.</li>
               <li><b>One rack:</b> RackSentinel guards Rack 01 only. The two racks beside it are scenery.</li>
               <li><b>The operator</b> stands in for a person. In scenarios they press P0 once readings are safe; the controller still decides.</li>
-              <li><b>Verified behaviour:</b> the controller logic is a line-by-line model of the submitted firmware, tested against the 12 official cases (C01–C12).</li>
+              <li><b>Verified behaviour:</b> the controller logic is a byte-level model of the v2 firmware. It reproduces all nine runs that passed on the AWS FPGA (R1 to R9) and 1,000 cases replayed on the RTL.</li>
               <li><b>Illustrative:</b> fan spin, lamps and beacon show the output commands. No physical actuators, sensors or contactors are part of the project.</li>
-              <li><b>P7 is an EPO request</b>, not a power disconnect. Switching hardware would sit behind it.</li>
+              <li><b>P7 is a power-off request</b>, not a disconnect. Switching hardware would sit behind it.</li>
               <li>Not connected to a physical rack or a live FPGA.</li>
             </ul>
             <h3 className="section-label">Rules</h3>
             <ul className="legend">
-              <li>Warm from 27.0 °C up to and including 32.0 °C → P4 Fan Boost.</li>
-              <li>Above 32.0 °C → P5 Maximum Fan and P7 EPO request (latched).</li>
-              <li>25.6 A and above → P6 Current Warning. Above 32.0 A → P6 and P7 (latched).</li>
-              <li>A latched EPO clears only on a <b>new</b> P0 press with temperature Normal and current below 25.6 A.</li>
-              <li>Invalid readings (0x3C) and bad CRCs (0x5A) change nothing. Voltage is validated and stored only.</li>
+              <li>Warm from 27.0 °C → P4 fan boost. Hot from 32.0 °C → P5 fans at maximum. A reading on a threshold takes the higher class.</li>
+              <li>Critical from 35.0 °C → P5 + P7 power-off (latched).</li>
+              <li>A rise of 2.0 °C or more between two readings is a thermal runaway → P7.</li>
+              <li>Water on the leak sensor (P1) → P7, with no message needed.</li>
+              <li>Power = V × I. At or above the limit (5.9 kW) → P6 overload alarm. It follows the reading and never cuts power.</li>
+              <li>Settings carry an error-correcting code: one flipped bit is repaired; two make the setting unreadable → P7 until it is rewritten.</li>
+              <li>The power-off clears only on a <b>new</b> P0 press once every cause is gone: below Critical, no runaway, dry, no unreadable setting.</li>
+              <li>Bad CRC (5A) and invalid values (3C) change nothing.</li>
             </ul>
           </section>
           <section>

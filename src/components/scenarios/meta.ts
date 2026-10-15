@@ -5,13 +5,13 @@
  */
 import type { StateTone } from "@/lib/tokens";
 
-export type CategoryId = "conditions" | "electrical" | "recovery" | "communication";
+export type CategoryId = "heat" | "water-power" | "memory" | "reset-link";
 
 export const CATEGORIES: { id: CategoryId; label: string }[] = [
-  { id: "conditions", label: "Rack conditions" },
-  { id: "electrical", label: "Electrical" },
-  { id: "recovery", label: "Recovery & reset" },
-  { id: "communication", label: "Communication" },
+  { id: "heat", label: "Heat and cooling" },
+  { id: "water-power", label: "Water and power" },
+  { id: "memory", label: "Memory faults (ECC)" },
+  { id: "reset-link", label: "Reset and link" },
 ];
 
 export interface ScenarioMeta {
@@ -24,17 +24,17 @@ export interface ScenarioMeta {
 }
 
 export const SCENARIO_META: Record<string, ScenarioMeta> = {
-  normal: { category: "conditions", value: "26.5 °C · 25.4 A", effect: "No outputs requested", tone: "normal" },
-  warm: { category: "conditions", value: "27.0 → 32.0 °C", effect: "P4 fan boost, no EPO", tone: "warning" },
-  "critical-heat": { category: "conditions", value: "32.5 °C", effect: "Maximum fan + EPO request", tone: "critical" },
-  "current-warning": { category: "electrical", value: "25.6 → 32.0 A", effect: "P6 current warning, no EPO", tone: "warning" },
-  "current-trip": { category: "electrical", value: "32.2 A", effect: "Current warning + EPO request", tone: "critical" },
-  combined: { category: "electrical", value: "32.5 °C · 32.2 A", effect: "Either fault keeps EPO latched", tone: "critical" },
-  recover: { category: "recovery", value: "32.5 → 26.5 °C", effect: "Safe readings, EPO stays latched", tone: "critical" },
-  "reset-warm": { category: "recovery", value: "27.0 °C", effect: "P0 refused while Warm", tone: "warning" },
-  "reset-current": { category: "recovery", value: "25.6 A", effect: "P0 refused at warning current", tone: "warning" },
-  "held-button": { category: "recovery", value: "P0 held", effect: "Held button cannot reset", tone: "warning" },
-  invalid: { category: "communication", value: "Reply 0x3C", effect: "Invalid reading, nothing changes", tone: "warning" },
-  corrupt: { category: "communication", value: "Reply 0x5A", effect: "Bad CRC cannot clear EPO", tone: "critical" },
-  "no-telemetry": { category: "communication", value: "Link silent", effect: "State held, P0 still works", tone: "warning" },
+  normal: { category: "heat", value: "22.0 °C · 20 A", effect: "No outputs, STATUS 40 2C 64 00", tone: "normal" },
+  "heat-up": { category: "heat", value: "26.5 → 32.0 °C", effect: "P4 boost, then P5 maximum", tone: "warning" },
+  critical: { category: "heat", value: "35.0 °C", effect: "Power-off; reset once below Critical", tone: "critical" },
+  runaway: { category: "heat", value: "+2.5 °C", effect: "Power-off before any threshold", tone: "critical" },
+  leak: { category: "water-power", value: "P1 wet", effect: "Power-off with no packet", tone: "critical" },
+  overload: { category: "water-power", value: "26 A · 5.98 kW", effect: "P6 alarm, never a power-off", tone: "warning" },
+  energy: { category: "water-power", value: "3 × 4.6 kW", effect: "ENERGY reports 230 Wh", tone: "normal" },
+  "ecc-one": { category: "memory", value: "1 bit flipped", effect: "Repaired; Critical still 35.0 °C", tone: "warning" },
+  "ecc-two": { category: "memory", value: "2 bits flipped", effect: "Fail-safe power-off until rewritten", tone: "critical" },
+  "held-button": { category: "reset-link", value: "P0 taped", effect: "Held button cannot reset", tone: "warning" },
+  corrupt: { category: "reset-link", value: "Reply 5A", effect: "Damaged packet changes nothing", tone: "warning" },
+  invalid: { category: "reset-link", value: "Reply 3C", effect: "Bad values rejected", tone: "warning" },
+  "silent-leak": { category: "reset-link", value: "Link silent", effect: "Leak still caught; P0 still works", tone: "critical" },
 };

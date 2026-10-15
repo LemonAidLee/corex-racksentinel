@@ -1,5 +1,5 @@
 /**
- * Scenario icon system: 13 original 48 × 48 voxel icons.
+ * Scenario icon system: original 48 × 48 voxel icons, one per scenario.
  *
  * Every icon = one isometric equipment base, rendered with the same voxel rasterizer as the
  * room, plus one or two 2D pixel badges that carry the state (thermometer level, shield, bolt,
@@ -48,11 +48,6 @@ function buttonBase(r: Raster, pressed: boolean) {
   r.drawBox({ x: 6, y: 3, z: 3, w: pressed ? 0.75 : 2.5, d: 4, h: 4, tex: pressed ? 0xb9bec4 : NEUTRAL.white });
 }
 
-function breakerBase(r: Raster) {
-  r.drawBox({ x: 0, y: 0, z: 0, w: 6, d: 8, h: 12, tex: (face, u, v, w, h, t) => (u < t || v < t || u >= w - t || v >= h - t ? 0x5d6670 : face === 1 && v > 4 && v < 8 && u > 2 && u < 4 ? 0x15181c : 0x6b747e) });
-  r.drawBox({ x: 2.5, y: 8, z: 3, w: 1, d: 3, h: 1, tex: 0x2a3038 }); // lever, thrown open
-}
-
 const packetTex = (broken: boolean): Tex => (face, u, v, w, h, t) => {
   if (u < t || v < t || u >= w - t || v >= h - t) return 0x305478;
   if (face === 0) return v % 2 < 1 && u > 1 && u < w - 1 && !(broken && u > w - 3) ? NEUTRAL.data : 0x3c5a78;
@@ -66,6 +61,21 @@ function packetBase(r: Raster, broken: boolean) {
   } else {
     r.drawBox({ x: 0, y: 1, z: 0, w: 10, d: 9, h: 3, tex: packetTex(false) });
   }
+}
+
+/** A chip package: dark body, pale die mark, gold pins along two sides. */
+function chipBase(r: Raster) {
+  r.drawBox({ x: 0, y: 0, z: 0, w: 10, d: 10, h: 2, tex: (face, u, v, w, h, t) => (u < t || v < t || u >= w - t || v >= h - t ? 0x3a424b : face === 2 && u > 3 && u < 7 && v > 3 && v < 7 ? 0x5d6670 : 0x1f2328) });
+  for (let i = 0; i < 4; i++) {
+    r.drawBox({ x: 1.5 + i * 2.2, y: -1.5, z: 0.5, w: 1, d: 1.5, h: 0.6, tex: 0xc8a24a });
+    r.drawBox({ x: 1.5 + i * 2.2, y: 10, z: 0.5, w: 1, d: 1.5, h: 0.6, tex: 0xc8a24a });
+  }
+}
+
+/** A puddle on the floor in front of a rack. */
+function rackPuddleBase(r: Raster) {
+  rackBase(r, { lamp: STATE.critical });
+  r.drawBox({ x: -1, y: 6.5, z: 0, w: 9, d: 4, h: 0.4, tex: 0x3c7fc4 | 0x1000000 });
 }
 
 function connectorBase(r: Raster) {
@@ -115,20 +125,6 @@ function triangle(color: number, glyph: "bolt" | "bang"): Mask {
   };
 }
 
-/** Current trip: red stop disc with a lightning bolt broken by a gap (opened circuit). */
-const brokenBolt: Mask = (x, y) => {
-  if ((x - 7.5) ** 2 + (y - 7.5) ** 2 > 52) return null;
-  const top = (y === 2 && (x === 9 || x === 10)) || (y === 3 && (x === 8 || x === 9)) || (y === 4 && (x === 7 || x === 8)) || (y === 5 && x >= 6 && x <= 9);
-  const bottom = (y === 9 && x >= 6 && x <= 9) || (y === 10 && (x === 7 || x === 8)) || (y === 11 && (x === 6 || x === 7)) || (y === 12 && (x === 5 || x === 6));
-  return top || bottom ? W : STATE.critical;
-};
-
-const arrowDown: Mask = (x, y) => {
-  if (x >= 6 && x <= 9 && y >= 1 && y <= 8) return NEUTRAL.data;
-  if (y >= 9 && y <= 14 && Math.abs(x - 7.5) <= 14 - y) return NEUTRAL.data;
-  return null;
-};
-
 const lock: Mask = (x, y) => {
   const shackle = y >= 1 && y <= 6 && x >= 4 && x <= 11 && !(x >= 6 && x <= 9 && y >= 3) && !(y === 1 && (x === 4 || x === 11));
   if (shackle) return NEUTRAL.steel;
@@ -153,6 +149,33 @@ const noSignal: Mask = (x, y) => {
   return arc ? W : NEUTRAL.graphite;
 };
 
+/** Water drop: blue, with a white highlight. */
+const drop: Mask = (x, y) => {
+  const cy = 10, r = 4.6;
+  const inBody = (x - 7.5) ** 2 + (y - cy) ** 2 <= r * r;
+  const inTip = y >= 1 && y < cy && Math.abs(x - 7.5) <= ((y - 1) / (cy - 1)) * r;
+  if (!inBody && !inTip) return null;
+  if ((x === 5 || x === 6) && y >= 8 && y <= 11) return W;
+  return NEUTRAL.data;
+};
+
+/** Steep rise: red arrow pointing up and right. */
+const arrowUpRight: Mask = (x, y) => {
+  const shaft = Math.abs(x + y - 15) <= 1 && x >= 2 && x <= 11;
+  const head = (y >= 1 && y <= 3 && x >= 7 && x <= 14) || (x >= 12 && x <= 14 && y >= 1 && y <= 8);
+  return shaft || head ? STATE.critical : null;
+};
+
+/** Gauge: steel dial with a needle near full scale. */
+const gauge: Mask = (x, y) => {
+  const r = Math.hypot(x - 7.5, y - 9);
+  if (y > 12 || r > 7.2) return null;
+  if (r > 5.8) return NEUTRAL.steel;
+  const needle = Math.abs((y - 9) * 0.9 + (x - 7.5) * 0.45) <= 0.7 && x >= 7 && y <= 9;
+  if (needle) return W;
+  return r < 1.2 ? W : NEUTRAL.graphite;
+};
+
 // ------------------------------------------------------------------ composition
 interface IconSpec {
   base: (r: Raster) => void;
@@ -167,25 +190,32 @@ const B_TOP: [number, number] = [29, 4];
 
 export const ICON_SPECS: Record<string, IconSpec> = {
   normal: { base: (r) => rackBase(r, { lamp: STATE.normal }), origin: RACK_O, badges: [{ mask: shieldCheck, at: B_MAIN }] },
-  warm: { base: (r) => rackBase(r, { lamp: STATE.warning }), origin: RACK_O, badges: [{ mask: thermometer(0.5, STATE.warning), at: B_MAIN }] },
-  "critical-heat": { base: (r) => rackBase(r, { lamp: STATE.critical }), origin: RACK_O, badges: [{ mask: thermometer(1, STATE.critical), at: B_MAIN }] },
-  "current-warning": { base: (r) => rackBase(r, { lamp: STATE.warning }), origin: RACK_O, badges: [{ mask: triangle(STATE.warning, "bolt"), at: B_MAIN }] },
-  "current-trip": { base: breakerBase, origin: [12, 13.5], badges: [{ mask: brokenBolt, at: B_MAIN }] },
-  combined: {
-    base: (r) => rackBase(r, { lamp: STATE.critical }),
+  "heat-up": { base: (r) => rackBase(r, { lamp: STATE.warning }), origin: RACK_O, badges: [{ mask: thermometer(0.6, STATE.warning), at: B_MAIN }] },
+  critical: { base: (r) => rackBase(r, { lamp: STATE.critical, topLamp: STATE.critical }), origin: RACK_O, badges: [{ mask: thermometer(1, STATE.critical), at: B_MAIN }] },
+  runaway: {
+    base: (r) => rackBase(r, { topLamp: STATE.critical }),
     origin: RACK_O,
     badges: [
-      { mask: thermometer(1, STATE.critical), at: B_MAIN },
-      { mask: triangle(STATE.warning, "bolt"), at: B_TOP },
+      { mask: thermometer(0.35, STATE.normal), at: B_MAIN },
+      { mask: arrowUpRight, at: B_TOP },
     ],
   },
-  recover: { base: (r) => rackBase(r, { topLamp: STATE.critical }), origin: RACK_O, badges: [{ mask: arrowDown, at: B_MAIN }] },
-  "reset-warm": { base: (r) => buttonBase(r, false), origin: [10, 12.5], badges: [{ mask: thermometer(0.5, STATE.warning), at: B_MAIN }] },
-  "reset-current": { base: (r) => buttonBase(r, false), origin: [10, 12.5], badges: [{ mask: triangle(STATE.warning, "bolt"), at: B_MAIN }] },
+  leak: { base: rackPuddleBase, origin: RACK_O, badges: [{ mask: drop, at: B_MAIN }] },
+  overload: { base: (r) => rackBase(r, { lamp: STATE.warning }), origin: RACK_O, badges: [{ mask: triangle(STATE.warning, "bolt"), at: B_MAIN }] },
+  energy: { base: (r) => rackBase(r, { lamp: STATE.normal }), origin: RACK_O, badges: [{ mask: gauge, at: B_MAIN }] },
+  "ecc-one": { base: chipBase, origin: [12, 12], badges: [{ mask: shieldCheck, at: B_MAIN }] },
+  "ecc-two": { base: chipBase, origin: [12, 12], badges: [{ mask: crossBox, at: B_MAIN }] },
   "held-button": { base: (r) => buttonBase(r, true), origin: [10, 12.5], badges: [{ mask: lock, at: B_MAIN }] },
   invalid: { base: (r) => packetBase(r, false), origin: [11, 10], badges: [{ mask: triangle(STATE.warning, "bang"), at: B_MAIN }] },
   corrupt: { base: (r) => packetBase(r, true), origin: [11, 10], badges: [{ mask: crossBox, at: B_MAIN }] },
-  "no-telemetry": { base: connectorBase, origin: [9, 10], badges: [{ mask: noSignal, at: B_MAIN }] },
+  "silent-leak": {
+    base: connectorBase,
+    origin: [9, 10],
+    badges: [
+      { mask: noSignal, at: B_TOP },
+      { mask: drop, at: B_MAIN },
+    ],
+  },
 };
 
 function abgr(rgb: number) {

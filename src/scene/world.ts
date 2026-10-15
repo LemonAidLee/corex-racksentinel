@@ -536,9 +536,13 @@ function vignette(r: Raster): void {
 // ------------------------------------------------------------------ dynamic objects
 export interface RackLook {
   time: number; // seconds
-  tempClass: number; // 0 Normal, 1 Warm, 3 Critical
+  tempClass: number; // 0 Normal, 1 Warm, 2 Hot, 3 Critical
+  /** GPIO output byte: P4..P7 drive the four door lamps. */
+  pins: number;
   overload: boolean;
   epo: boolean;
+  /** Water on the leak sensor (P1). */
+  leak: boolean;
   fanAngle: number;
   fanLevel: 0 | 1 | 2; // 0 normal, 1 boost (P4), 2 max (P5)
   ledRate: number;
@@ -558,7 +562,7 @@ export interface RackLook {
 }
 
 const LAMP_U = [2.5, 8.5, 14.5, 20.5];
-const semantic = (tempClass: number) => (tempClass === 3 ? PAL.crit : tempClass === 1 ? PAL.warn : PAL.ok);
+const semantic = (tempClass: number) => (tempClass === 3 ? PAL.crit : tempClass >= 1 ? PAL.warn : PAL.ok);
 
 /** A round-cornered indicator lamp in [u0, u0+4) × [v0, v0+4); -2 means "outside the corner". */
 function lamp(u: number, v: number, u0: number, v0: number, lit: boolean, color: number, t: number): number {
@@ -572,8 +576,8 @@ function lamp(u: number, v: number, u0: number, v0: number, lit: boolean, color:
 }
 
 function doorTex(L: RackLook): Tex {
-  const lamps = [L.tempClass === 1, L.tempClass === 3, L.overload, L.epo];
-  const lampColor = [PAL.warn, PAL.crit, PAL.warn, PAL.crit];
+  const lamps = [!!(L.pins & 0x10), !!(L.pins & 0x20), !!(L.pins & 0x40), !!(L.pins & 0x80)];
+  const lampColor = [PAL.warn, PAL.warn, PAL.warn, PAL.crit];
   const ledStep = Math.floor(L.time * L.ledRate);
   const bar = semantic(L.tempClass);
   const plate = 0x171b20;
@@ -599,7 +603,8 @@ function doorTex(L: RackLook): Tex {
       if (v < 16 || v >= 18 || u < 2 || u >= w - 2) return PAL.serverLine;
       if ((u - 2) % 2 < t) return PAL.serverLine;
       const idx = Math.floor((u - 2) / 2);
-      const on = L.tempClass === 0 ? true : L.tempClass === 1 ? idx % 3 !== 2 : idx % 2 === 0;
+      // segment pattern by class: solid, every third off, alternate, every other pair
+      const on = L.tempClass === 0 ? true : L.tempClass === 1 ? idx % 3 !== 2 : L.tempClass === 2 ? idx % 2 === 0 : idx % 4 < 1;
       return on ? bar | EMISSIVE : shade(bar, 0.3);
     }
     // eight 1U servers
@@ -686,6 +691,13 @@ export function drawRackDynamic(r: Raster, L: RackLook): void {
   r.drawBox({ x: BEACON.x, y: BEACON.y, z: 82, w: 6, d: 6, h: 7, tex: lensTex(L.epo, beaconColor, PAL.critDim), id: OBJ.RACK });
   r.drawBox({ x: BEACON.x + 1, y: BEACON.y + 1, z: 89, w: 4, d: 4, h: 1, tex: PAL.rackEdge, id: OBJ.RACK });
   r.drawBox({ x: AMBER_LAMP.x + 1, y: AMBER_LAMP.y + 1, z: 82, w: 4, d: 4, h: 4, tex: lensTex(L.overload, PAL.warn, PAL.warnDim), id: OBJ.RACK });
+  // leak sensor: a small plate on the floor in front of the rack; water spreads around it when wet
+  r.drawBox({ x: 92, y: 30, z: 0, w: 4, d: 3, h: 0.6, tex: L.leak ? PAL.water | EMISSIVE : PAL.steelDark, id: OBJ.RACK });
+  if (L.leak) {
+    for (const [x, y, w, d] of [[84, 27, 18, 8], [88, 34, 22, 6], [97, 26, 14, 5]] as const) {
+      r.drawBox({ x, y, z: 0, w, d, h: 0.25, tex: (_f, u, v) => ((Math.floor(u * 2 + v * 3 + L.time * 2) % 7 === 0 ? mix(PAL.water, 0xffffff, 0.35) : PAL.water) | EMISSIVE) });
+    }
+  }
   const c = RESET.cap;
   r.drawBox({ x: c.x, y: c.y, z: c.z, w: L.capPressed ? 1.25 : c.w, d: c.d, h: c.h, tex: capTex(L.capPressed, L.capHeld), id: OBJ.BUTTON });
   // controller module heartbeat: neutral and quiet, present whenever the controller runs

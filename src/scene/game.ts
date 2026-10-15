@@ -7,7 +7,8 @@
  * the raster renders that frame at a quality-dependent scale S.
  */
 import type { SimulationRuntime } from "@/sim/runtime";
-import { TEMP_CLASS } from "@/sim/controller";
+import { CFG, TEMP_CLASS, settingsView } from "@/sim/controller";
+import { INPUT } from "@/sim/protocol";
 import { Camera, type FocusName } from "./camera";
 import { ANCHORS, AMBER_LAMP, BEACON, NAME_BY_OBJ, NODES, OBJ, OBJ_BY_NAME, ORIGIN, UART_PATH, type AnchorName, type Interactive } from "./layout";
 import { createRoomDecals, drawDecal, type Decal } from "./decals";
@@ -34,10 +35,10 @@ export interface GameCallbacks {
 interface Mood {
   warm: number;
   crit: number;
-  /** P6 current warning without a trip. */
+  /** P6 power overload. */
   current: number;
-  /** Current above the trip level. */
-  trip: number;
+  /** Water on the leak sensor (P1). */
+  leak: number;
   epo: number;
   /** UART link indicator. */
   link: number;
@@ -109,7 +110,7 @@ export class Game {
   private flashT = 0;
   private pulses: Pulse[] = [];
   private bursts: Burst[] = [];
-  private mood: Mood = { warm: 0, crit: 0, current: 0, trip: 0, epo: 0, link: 0 };
+  private mood: Mood = { warm: 0, crit: 0, current: 0, leak: 0, epo: 0, link: 0 };
   private beaconAngle = 0;
   private glitchT = 0;
   /** Incident-following camera: on by default, never under reduced motion. */
@@ -216,7 +217,7 @@ export class Game {
         if (outcome === "accepted" && this.rt.recovery.phase === "idle") this.autoReturnAt = this.time + 2.2;
       }),
       bus.on("state", (s) => {
-        const calm = !s.epo && s.tempClass === TEMP_CLASS.NORMAL && !s.overload;
+        const calm = !s.epo && s.tempClass === TEMP_CLASS.NORMAL && !s.overload && !(s.inputs & INPUT.LEAK);
         this.operator.setCalm(calm);
       }),
       bus.on("restart", () => {
@@ -493,14 +494,17 @@ export class Game {
 
   private look(): RackLook {
     const s = this.rt.controller.state;
-    const fanLevel = s.tempClass === TEMP_CLASS.CRITICAL ? 2 : s.tempClass === TEMP_CLASS.WARM ? 1 : 0;
-    const anyCrit = s.epo || s.tempClass === TEMP_CLASS.CRITICAL;
-    const anyWarn = s.tempClass === TEMP_CLASS.WARM || s.overload;
+    const fanLevel = s.tempClass >= TEMP_CLASS.HOT ? 2 : s.tempClass === TEMP_CLASS.WARM ? 1 : 0;
+    const leak = !!(s.inputs & INPUT.LEAK);
+    const anyCrit = s.epo || s.tempClass === TEMP_CLASS.CRITICAL || leak;
+    const anyWarn = s.tempClass >= TEMP_CLASS.WARM || s.overload;
     return {
       time: this.time,
       tempClass: s.tempClass,
+      pins: s.pins,
       overload: s.overload,
       epo: s.epo,
+      leak,
       fanAngle: this.fanAngle,
       fanLevel,
       ledRate: this.reducedMotion ? 1 : 5,
@@ -509,7 +513,7 @@ export class Game {
       capHeld: this.rt.p0Down && !this.operator.pressing,
       monitorState: anyCrit ? "crit" : anyWarn ? "warn" : "ok",
       monitorEpo: s.epo,
-      readings: { v: s.voltage, i: s.latestCurrent, t: s.latestTemp, got: s.gotTemp },
+      readings: { v: settingsView(s)[CFG.VOLTAGE].value, i: s.latestCurrent, t: s.latestTemp, got: s.gotTemp },
       linkSilent: !this.rt.streaming,
       heartbeat: this.reducedMotion || this.time % 2.4 < 0.16 || (this.time % 2.4 > 0.34 && this.time % 2.4 < 0.48),
       link: this.mood.link,
@@ -520,12 +524,11 @@ export class Game {
   /** Ease the room mood toward the controller state: quick to alarm, slow and staged to recover. */
   private updateMood(dt: number): void {
     const s = this.rt.controller.state;
-    const trip = s.gotCurrent && s.latestCurrent > s.tripCurrent;
     const target: Mood = {
-      warm: s.tempClass === TEMP_CLASS.WARM ? 1 : 0,
+      warm: s.tempClass === TEMP_CLASS.WARM ? 0.6 : s.tempClass === TEMP_CLASS.HOT ? 1 : 0,
       crit: s.tempClass === TEMP_CLASS.CRITICAL ? 1 : 0,
-      current: s.overload && !trip ? 1 : 0,
-      trip: trip ? 1 : 0,
+      current: s.overload ? 1 : 0,
+      leak: s.inputs & INPUT.LEAK ? 1 : 0,
       epo: s.epo ? 1 : 0,
       link: this.rt.streaming ? (this.pulses.length ? 1 : 0.5) : 0,
     };
@@ -590,7 +593,7 @@ export class Game {
   /**
    * State-reactive lighting, all hard-banded pools: cool overhead light in normal operation,
    * amber near Rack 01 when Warm, a sweeping red beacon and red floor reflections while the EPO
-   * request is latched, amber at the current lamp, red rack-edge light on a current trip.
+   * is latched, amber at the overload lamp, cold blue light off the water when the leak sensor is wet.
    * Pools scale with the eased mood, so recovery fades in stages instead of switching off.
    */
   private drawLights(r: Raster, L: RackLook): void {
@@ -618,10 +621,10 @@ export class Game {
       if (this.reducedMotion) pool(103, 40, 0, 26, 13, PAL.crit, 0.06 * m.epo, 2);
       else pool(103 + Math.cos(this.beaconAngle) * 30, 42 + Math.sin(this.beaconAngle) * 16, 0, 22, 11, PAL.crit, 0.11 * m.epo, 2);
     }
-    // P6 current warning: the amber lamp lights its surroundings
-    pool(AMBER_LAMP.x + 3, AMBER_LAMP.y + 3, 78, 40, 22, PAL.warn, 0.13 * Math.max(m.current, m.trip), 3);
-    // current trip: red light along Rack 01's own edges
-    pool(100, 26, 40, 34, 52, PAL.crit, 0.12 * m.trip, 3, OBJ.RACK);
+    // P6 power overload: the amber lamp lights its surroundings
+    pool(AMBER_LAMP.x + 3, AMBER_LAMP.y + 3, 78, 40, 22, PAL.warn, 0.13 * m.current, 3);
+    // water on the floor in front of the rack reflects a cold blue
+    pool(100, 34, 0, 26, 12, PAL.water, 0.16 * m.leak, 3);
 
     // DCIM monitor spill (brighter while a rejected packet tears the display)
     const monColor = L.monitorState === "crit" ? PAL.crit : L.monitorState === "warn" ? PAL.warn : 0x6fa8c8;
@@ -772,7 +775,8 @@ export class Game {
       else if (a.place === "above") { left = x - w / 2; top = y - a.gap - h; }
       else { left = x - w / 2; top = y + a.gap; }
       const m = 12;
-      const topSafe = 92, bottomSafe = 64;
+      // clears the brand block (wordmark row + page switcher) and the status panel
+      const topSafe = 110, bottomSafe = 64;
       left = Math.max(m, Math.min(this.viewW - w - m, left));
       top = Math.max(topSafe, Math.min(this.cssH - h - bottomSafe, top));
     }

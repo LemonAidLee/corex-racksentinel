@@ -27,9 +27,11 @@ function diff(b: StateDigest, a: StateDigest): { label: string; from: string; to
   const out: { label: string; from: string; to: string; tone: NoticeTone }[] = [];
   if (b.temp !== a.temp) out.push({ label: "Temp", from: tempText(b), to: tempText(a), tone: "info" });
   if (b.current !== a.current) out.push({ label: "Current", from: b.current === null ? "—" : fmtAmps(b.current), to: a.current === null ? "—" : fmtAmps(a.current), tone: "info" });
-  if (b.tempClass !== a.tempClass) out.push({ label: "Class", from: CLASS_NAME[b.tempClass], to: CLASS_NAME[a.tempClass], tone: a.tempClass === 3 ? "alarm" : a.tempClass === 1 ? "warn" : "ok" });
+  if (b.tempClass !== a.tempClass) out.push({ label: "Class", from: CLASS_NAME[b.tempClass], to: CLASS_NAME[a.tempClass], tone: a.tempClass === 3 ? "alarm" : a.tempClass >= 1 ? "warn" : "ok" });
+  if (b.leak !== a.leak) out.push({ label: "P1", from: b.leak ? "wet" : "dry", to: a.leak ? "wet" : "dry", tone: a.leak ? "alarm" : "ok" });
   if ((b.pins & 0x70) !== (a.pins & 0x70)) out.push({ label: "Outputs", from: pinsText(b.pins & 0x70), to: pinsText(a.pins & 0x70), tone: a.pins & 0x70 ? "warn" : "ok" });
   if (b.epo !== a.epo) out.push({ label: "P7", from: b.epo ? "latched" : "clear", to: a.epo ? "latched" : "clear", tone: a.epo ? "alarm" : "ok" });
+  if (b.fault !== a.fault) out.push({ label: "Settings", from: b.fault ? "fault" : "OK", to: a.fault ? "fault" : "OK", tone: a.fault ? "alarm" : "ok" });
   return out;
 }
 
@@ -38,13 +40,22 @@ const NODE_MS = 280;
 /**
  * Causality ribbon: input → validation → classification → output, each node lighting up in
  * order, with the state before and after the decision underneath. A follow-up chain with the
- * same shape (a ramp step) updates in place instead of replaying.
+ * same shape (a ramp step) updates in place instead of replaying. With `hold` the ribbon never
+ * fades by itself: it stays until the next chain replaces it, so a guided demo beat keeps its
+ * decision on screen for as long as the presenter talks about it.
  */
-export function CausalityRibbon({ large = false }: { large?: boolean }) {
+export function CausalityRibbon({ large = false, hold = false, generation = 0 }: { large?: boolean; hold?: boolean; generation?: number }) {
   const { chain, paused } = useSim();
   // which chain is on screen, its shape, and how many times the reveal has been replayed
   const [track, setTrack] = useState({ id: -1, sig: "", replay: 0 });
   const [hiddenId, setHiddenId] = useState(-1);
+  const [gen, setGen] = useState(generation);
+  // a new guided-demo beat clears the ribbon: the screen goes quiet while the audience reads the
+  // new line, and the panel comes back only when this beat's decision actually happens
+  if (generation !== gen) {
+    setGen(generation);
+    setHiddenId(chain ? chain.id : -1);
+  }
   if (chain && chain.id !== track.id) {
     const sig = chain.kind + chain.nodes.slice(1).map((n) => n.label).join("|");
     setTrack({ id: chain.id, sig, replay: sig === track.sig && hiddenId !== track.id ? track.replay : track.replay + 1 });
@@ -53,15 +64,16 @@ export function CausalityRibbon({ large = false }: { large?: boolean }) {
   const replay = track.replay;
 
   useEffect(() => {
-    if (!shown || paused) return;
+    if (!shown || paused || hold) return;
     const id = setTimeout(() => setHiddenId(shown.id), 5200 + shown.nodes.length * NODE_MS);
     return () => clearTimeout(id);
-  }, [shown, paused]);
+  }, [shown, paused, hold]);
 
   if (!shown) return null;
   const changes = diff(shown.before, shown.after);
   return (
-    <section className={`ribbon panel ${large ? "is-large" : ""}`} aria-label="Controller decision" key={replay}>
+    <section className={`ribbon panel ${large ? "is-large" : ""} ${hold ? "is-cue" : ""}`} aria-label="Controller decision" key={replay}>
+      {hold && <span className="ribbon-cap" aria-hidden="true">What the chip just decided</span>}
       <ol className="ribbon-nodes">
         {shown.nodes.map((n, i) => (
           <Fragment key={i}>
@@ -89,10 +101,14 @@ export function CausalityRibbon({ large = false }: { large?: boolean }) {
 const KIND_ICON: Record<TimelineEntry["kind"], IconName> = {
   scenario: "play",
   telemetry: "send",
+  command: "sliders",
+  query: "evidence",
   validation: "warn",
   class: "temp",
   output: "bolt",
+  ecc: "chip",
   epo: "crit",
+  leak: "drop",
   link: "link",
   reset: "restart",
 };
@@ -170,7 +186,7 @@ export function EvidencePanel({ onClose, onReplay }: { onClose: () => void; onRe
         <button className="btn btn-icon btn-ghost" onClick={onClose} aria-label="Close evidence (E)" data-tip="Close · E"><Icon name="close" size={18} /></button>
       </header>
       {!sc ? (
-        <p className="panel-note">Run a scenario to compare what the official case expects with what the controller model does.</p>
+        <p className="panel-note">Run a scenario to compare what the rehearsed FPGA run expects with what the controller model does.</p>
       ) : (
         <>
           <dl className="ev-meta">
@@ -263,14 +279,35 @@ export function FocusLabels() {
 }
 
 /** Short narration captions while the guided demo plays. */
-export function DemoCaption({ index }: { index: number }) {
+/**
+ * The guided demo's single block of words: step, title, the line the audience reads, the detail
+ * underneath, and the controls. It replaces the side panel while the demo runs so the beat is
+ * never written on screen twice.
+ */
+export function DemoStrip({ index, onPrev, onNext, onExit }: { index: number; onPrev: () => void; onNext: () => void; onExit: () => void }) {
   const beat = DEMO_BEATS[index];
   if (!beat) return null;
-  const first = beat.caption.split(/(?<=\.)\s/)[0];
+  const last = index >= DEMO_BEATS.length - 1;
   return (
-    <div className="caption" aria-hidden="true">
-      <span className="caption-title">{beat.title}</span> {first}
-    </div>
+    <section className="demo-strip panel" aria-label="Guided demonstration" aria-live="polite">
+      <header className="demo-strip-head">
+        <span className="demo-step">{index + 1} / {DEMO_BEATS.length}</span>
+        {beat.run && <span className="demo-run" data-tip={`Matches hardware run ${beat.run}`}>{beat.run}</span>}
+        <h2 className="demo-strip-title">{beat.title}</h2>
+        <span className="demo-progress" aria-hidden="true">
+          {DEMO_BEATS.map((_, i) => <span key={i} className={i <= index ? "on" : ""} />)}
+        </span>
+        <button className="btn btn-icon btn-ghost" onClick={onExit} aria-label="Exit demo" data-tip="Exit demo · G">
+          <Icon name="close" size={18} />
+        </button>
+      </header>
+      <p className="demo-say" key={index}>{beat.say}</p>
+      <p className="demo-detail">{beat.caption}</p>
+      <div className="demo-nav">
+        <button className="btn" onClick={onPrev} disabled={index <= 0} aria-label="Previous step (Left arrow)"><Icon name="left" size={16} /> Back</button>
+        <button className="btn btn-primary" onClick={onNext} disabled={last} aria-label="Next step (Right arrow)">{last ? "End" : "Next"} <Icon name="right" size={16} /></button>
+      </div>
+    </section>
   );
 }
 

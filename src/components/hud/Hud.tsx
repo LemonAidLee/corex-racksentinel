@@ -2,8 +2,9 @@
 import { useEffect, useState } from "react";
 import { useRuntime, useSim } from "../context";
 import { Icon, type IconName } from "../icons";
-import { conditionInfo, currentInfo, epoInfo, fmtSimTime, resetInfo, tempInfo, type StateInfo, type Tone } from "@/lib/present";
-import { rawToAmps, rawToDegC } from "@/sim/units";
+import { conditionInfo, epoInfo, fmtSimTime, powerInfo, resetInfo, tempInfo, type StateInfo, type Tone } from "@/lib/present";
+import Link from "next/link";
+import { energyWh, powerKW, rawToAmps, rawToDegC } from "@/sim/units";
 import { replyName, hex } from "@/sim/protocol";
 import type { Notice, NoticeTone } from "@/sim/events";
 import { QUALITY_LABEL, QUALITY_SIZE, type Quality } from "@/scene/raster";
@@ -28,16 +29,36 @@ export function Reading({ value, unit }: { value: string; unit: string }) {
   );
 }
 
+/**
+ * Wordmark plus the page switcher. The two explainer pages are siblings of the
+ * simulation, so they sit in one segmented control with the current page marked:
+ * a plain run of words read as prose and nobody clicked them.
+ */
 export function Brand({ onHelp }: { onHelp: () => void }) {
   return (
     <div className="brand">
       <div className="brand-row">
         <h1 className="brand-name">RackSentinel</h1>
         <button className="btn btn-icon" onClick={onHelp} aria-label="Help, rules and keyboard shortcuts" data-tip="Help · ?">
-          <Icon name="help" size={20} />
+          <Icon name="help" size={18} />
         </button>
       </div>
-      <p className="brand-sub">Behavioral digital twin · simulation only</p>
+      <nav className="brand-nav" aria-label="Pages">
+        <span className="brand-tab is-current" aria-current="page">
+          <Icon name="play" size={14} weight="fill" />
+          Simulation
+        </span>
+        <Link href="/features" className="brand-tab">
+          <Icon name="book" size={14} />
+          Features
+          <span className="brand-tab-go" aria-hidden="true"><Icon name="arrow" size={13} weight="bold" /></span>
+        </Link>
+        <Link href="/data-flow" className="brand-tab">
+          <Icon name="flow" size={14} />
+          Data flow
+          <span className="brand-tab-go" aria-hidden="true"><Icon name="arrow" size={13} weight="bold" /></span>
+        </Link>
+      </nav>
     </div>
   );
 }
@@ -45,7 +66,7 @@ export function Brand({ onHelp }: { onHelp: () => void }) {
 export function StatusSeg({ cap, info, alarm }: { cap: string; info: StateInfo; alarm?: boolean }) {
   return (
     <div className={`status-seg tone-${info.tone} ${alarm ? "is-alarm" : ""}`}>
-      <span className="status-icon"><Icon name={info.icon} size={18} weight="bold" /></span>
+      <span className="status-icon"><Icon name={info.icon} size={16} weight="bold" /></span>
       <div>
         <div className="status-cap">{cap}</div>
         <div className="status-val">{info.label}</div>
@@ -75,7 +96,7 @@ export function PrimaryStatus() {
 function CtlButton({ icon, label, onClick, pressed, shortcut }: { icon: IconName; label: string; onClick: () => void; pressed?: boolean; shortcut?: string }) {
   return (
     <button className="btn btn-icon" onClick={onClick} aria-label={label} aria-pressed={pressed} data-tip={shortcut ? `${label} · ${shortcut}` : label}>
-      <Icon name={icon} size={20} />
+      <Icon name={icon} size={18} />
     </button>
   );
 }
@@ -90,7 +111,7 @@ export function ControlBar(p: {
   return (
     <div className="controls" role="toolbar" aria-label="Presentation controls">
       <button className={`btn ${p.demo ? "is-selected" : ""}`} onClick={p.onDemo} aria-pressed={p.demo} data-tip="Guided demonstration · G">
-        <Icon name="play" size={18} weight={p.demo ? "fill" : "regular"} /> <span className="btn-label">{p.demo ? "Exit demo" : "Guided demo"}</span>
+        <Icon name="play" size={16} weight={p.demo ? "fill" : "regular"} /> <span className="btn-label">{p.demo ? "Exit demo" : "Guided demo"}</span>
       </button>
       <label className="sr-only" htmlFor="quality">Render quality</label>
       <select id="quality" className="select" value={p.quality} onChange={(e) => p.onQuality(e.target.value as Quality)} title={`Render quality: ${QUALITY_LABEL[p.quality]}, ${QUALITY_SIZE(p.quality)} room raster`}>
@@ -150,8 +171,8 @@ export function PromptBar({ hover }: { hover: string | null }) {
   else if (hover === "button") text = "P0 reset button: click to send the operator to press it.";
   else if (hover === "terminal") text = "DCIM terminal: click to change conditions and send telemetry.";
   else if (s.epo && p0Down && resetBlockers.includes("held")) { text = "P0 is held down. Release P0 and press again: click the reset button."; tone = "warning"; }
-  else if (s.epo && resetBlockers.length === 0) { text = "Readings are safe but the EPO request is latched. Press P0 to acknowledge recovery."; tone = "warning"; }
-  else if (s.epo) { text = "EPO request latched. Conditions must return to Normal before P0 can clear it."; tone = "critical"; }
+  else if (s.epo && resetBlockers.length === 0) { text = "Every trip cause is gone but the power-off is latched. Press P0 to acknowledge recovery."; tone = "warning"; }
+  else if (s.epo) { text = "Power-off latched. Every trip cause must be gone before P0 can clear it."; tone = "critical"; }
   else if (!streaming) { text = "Telemetry is stopped. The controller holds its last state."; tone = "warning"; }
   else text = "Monitoring. Inspect the rack, change conditions at the terminal, or run a scenario.";
   return (
@@ -172,7 +193,7 @@ export function TelemetrySummary() {
     return () => clearInterval(id);
   }, []);
   const age = lastSampleAt === null ? null : Math.max(0, (rt.time - lastSampleAt) / 1000);
-  const t = tempInfo(s), c = currentInfo(s);
+  const t = tempInfo(s), p = powerInfo(s);
   const code = lastFrame?.reply[0];
   return (
     <section className="telemetry panel panel-major" aria-label="Latest valid readings">
@@ -185,9 +206,10 @@ export function TelemetrySummary() {
         </span>
       </div>
       <dl className="tele-grid">
-        <div><dt>Voltage</dt><dd>{s.gotCurrent ? <Reading value={String(s.voltage)} unit="V" /> : "—"}</dd></div>
-        <div key={`c-${c.tone}`} className={`tone-${c.tone}`}><dt>Current <i aria-hidden="true">●</i><span className="sr-only">{c.label}</span></dt><dd>{s.gotCurrent ? <Reading value={rawToAmps(s.latestCurrent).toFixed(1)} unit="A" /> : "—"}</dd></div>
-        <div key={`t-${t.tone}`} className={`tone-${t.tone}`}><dt>Temperature <i aria-hidden="true">●</i><span className="sr-only">{t.label}</span></dt><dd>{s.gotTemp ? <Reading value={rawToDegC(s.latestTemp).toFixed(1)} unit="°C" /> : "—"}</dd></div>
+        <div key={`t-${t.tone}`} className={`tone-${t.tone}`}><dt>Temperature <i aria-hidden="true">●</i><span className="sr-only">{t.label}</span></dt><dd>{s.gotTemp ? <Reading value={rawToDegC(s.latestTemp).toFixed(1)} unit="°C" /> : "-"}</dd></div>
+        <div><dt>Current</dt><dd>{s.gotCurrent ? <Reading value={rawToAmps(s.latestCurrent).toFixed(1)} unit="A" /> : "-"}</dd></div>
+        <div key={`p-${p.tone}`} className={`tone-${p.tone}`}><dt>Power <i aria-hidden="true">●</i><span className="sr-only">{p.label}</span></dt><dd>{s.power !== null ? <Reading value={powerKW(s.power).toFixed(2)} unit="kW" /> : "-"}</dd></div>
+        <div><dt>Energy</dt><dd><Reading value={String(energyWh(s.energy))} unit="Wh" /></dd></div>
       </dl>
       {lastFrame && (
         <div className="tele-foot">
@@ -218,7 +240,7 @@ function ToastItem({ n }: { n: Notice }) {
     return () => clearTimeout(id);
   }, [rt, n]);
   const look = TOAST_LOOK[n.tone];
-  const isEpo = n.tone === "alarm" && n.title.startsWith("EPO request latched");
+  const isEpo = n.tone === "alarm" && (n.title.startsWith("Power-off latched") || n.title.startsWith("Water leak"));
   return (
     <li className={`toast tone-${look.tone} ${isEpo ? "is-epo" : ""}`}>
       <span className="toast-icon"><Icon name={look.icon} size={16} weight="bold" /></span>

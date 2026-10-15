@@ -11,29 +11,30 @@ function play(id: string, ms = 45000) {
 }
 
 describe("incident timeline", () => {
-  it("records the critical-heat incident in causal order", () => {
-    const rt = play("critical-heat");
+  it("records the overheat incident in causal order", () => {
+    const rt = play("critical");
     const titles = rt.getSnapshot().timeline.map((e) => e.title);
     const idx = (s: string) => titles.findIndex((t) => t.includes(s));
     expect(idx("Scenario started")).toBe(0);
-    expect(idx("Telemetry 32.5 °C")).toBeGreaterThan(0);
-    expect(idx("Temperature Normal → Critical")).toBeGreaterThan(idx("Telemetry 32.5 °C"));
-    expect(idx("P5 maximum fan on")).toBeGreaterThan(idx("Telemetry 32.5 °C"));
-    expect(idx("P7 EPO request latched")).toBeGreaterThan(idx("P5 maximum fan on"));
-    expect(idx("Recovery reading")).toBeGreaterThan(idx("P7 EPO request latched"));
+    expect(idx("Reading TEMP 35.0 °C")).toBeGreaterThan(0);
+    expect(idx("Temperature Hot → Critical")).toBeGreaterThan(idx("Reading TEMP 35.0 °C"));
+    expect(idx("P7 power-off latched")).toBeGreaterThan(idx("Temperature Hot → Critical"));
+    expect(idx("P0 refused · temperature Critical")).toBeGreaterThan(idx("P7 power-off latched"));
+    expect(idx("Recovery reading")).toBeGreaterThan(idx("P0 refused"));
     expect(idx("P0 accepted")).toBeGreaterThan(idx("Recovery reading"));
+    expect(idx("TRIP_INFO")).toBeGreaterThan(idx("P0 accepted"));
     expect(idx("Scenario completed")).toBe(titles.length - 1);
   });
 
-  it("does not record routine samples that change nothing", () => {
+  it("does not record routine readings that change nothing", () => {
     const rt = new SimulationRuntime();
     for (let t = 0; t < 20000; t += 16) rt.advance(16);
-    // the first sample (no reading yet → a reading) is recorded; the repeats are not
-    expect(rt.getSnapshot().timeline.length).toBe(1);
+    // the first TEMP and CURRENT (no reading yet → a reading) are recorded; the repeats are not
+    expect(rt.getSnapshot().timeline.length).toBe(2);
   });
 
   it("restart clears the record", () => {
-    const rt = play("current-trip");
+    const rt = play("leak");
     expect(rt.getSnapshot().timeline.length).toBeGreaterThan(3);
     rt.restart();
     expect(rt.getSnapshot().timeline).toEqual([]);
@@ -41,7 +42,7 @@ describe("incident timeline", () => {
   });
 
   it("stamps each entry with the state it left behind", () => {
-    const rt = play("critical-heat");
+    const rt = play("critical");
     const latch = rt.getSnapshot().timeline.find((e) => e.kind === "epo")!;
     expect(latch.values.epo).toBe(true);
     expect(latch.values.pins & 0xa0).toBe(0xa0);
@@ -51,41 +52,45 @@ describe("incident timeline", () => {
 describe("causality chain", () => {
   it("explains a latch from input to output", () => {
     const rt = new SimulationRuntime();
-    rt.setConditions({ volts: 230, amps: 25.4, degC: 26.5 }, true);
-    rt.setConditions({ volts: 230, amps: 25.4, degC: 32.5 }, true);
+    rt.setConditions({ amps: 20, degC: 34.5 }, true);
+    rt.setConditions({ amps: 20, degC: 35.0 }, true);
+    // the CURRENT packet after it changed nothing, so the TEMP decision stays on the ribbon
     const c = rt.getSnapshot().chain!;
-    expect(c.nodes.map((n) => n.label)).toEqual([
-      "32.5 °C · 25.4 A telemetry",
-      "CRC accepted",
-      "Critical temperature",
-      "P5 maximum fan",
-      "P7 EPO request latched",
-    ]);
+    expect(c.nodes.map((n) => n.label)).toEqual(["TEMP 35.0 °C", "CRC accepted", "Critical temperature", "P7 power-off · Critical temperature"]);
     expect(c.before.epo).toBe(false);
     expect(c.after.epo).toBe(true);
   });
 
-  it("shows a rejected packet changing nothing", () => {
+  it("shows a damaged packet changing nothing", () => {
     const rt = new SimulationRuntime();
-    rt.setConditions({ volts: 230, amps: 25.4, degC: 32.5 }, true);
-    rt.runStep({ at: 0, type: "corrupt", amps: 25.4, degC: 26.5 }, false);
+    rt.setConditions({ amps: 20, degC: 34.5 }, true);
+    rt.runStep({ at: 0, type: "corrupt", degC: 26 }, false);
     const c = rt.getSnapshot().chain!;
-    expect(c.nodes.map((n) => n.label)).toEqual(["Packet received", "CRC check failed", "Reply 0x5A", "Controller state unchanged"]);
+    expect(c.nodes.map((n) => n.label)).toEqual(["Packet received", "CRC check failed", "Reply 0x5A", "State unchanged"]);
     expect(c.after).toEqual(c.before);
+  });
+
+  it("explains a leak trip without any packet", () => {
+    const rt = new SimulationRuntime();
+    rt.setConditions({ amps: 20, degC: 22 }, true);
+    rt.setLeak(true);
+    const c = rt.getSnapshot().chain!;
+    expect(c.kind).toBe("leak");
+    expect(c.nodes.at(-1)!.label).toBe("P7 power-off · water leak");
   });
 
   it("explains a refused and an accepted P0 press", () => {
     const rt = new SimulationRuntime();
-    rt.setConditions({ volts: 230, amps: 25.4, degC: 32.5 }, true);
-    rt.setConditions({ volts: 230, amps: 25.4, degC: 30 }, true);
+    rt.setConditions({ amps: 20, degC: 34.5 }, true);
+    rt.setConditions({ amps: 20, degC: 35.0 }, true);
     rt.pressReset(false);
     expect(rt.getSnapshot().chain!.nodes.map((n) => n.label)).toContain("Reset refused");
     rt.buttonUp();
-    rt.setConditions({ volts: 230, amps: 25.4, degC: 26.5 }, true);
+    rt.setConditions({ amps: 20, degC: 34.5 }, true);
     rt.pressReset(false);
     const c = rt.getSnapshot().chain!;
     expect(c.kind).toBe("reset");
-    expect(c.nodes.at(-1)!.label).toBe("P7 EPO request cleared");
+    expect(c.nodes.at(-1)!.label).toBe("P7 power-off cleared");
     expect(c.before.epo).toBe(true);
     expect(c.after.epo).toBe(false);
   });
@@ -108,8 +113,8 @@ describe("evidence mode", () => {
 
   it("a fresh scenario is pending, not failed", () => {
     const rt = new SimulationRuntime();
-    rt.playScenario("warm");
+    rt.playScenario("heat-up");
     const snap = rt.getSnapshot();
-    expect(evaluateEvidence("warm", snap.timeline, snap.controller, false).every((r) => r.status === "pending")).toBe(true);
+    expect(evaluateEvidence("heat-up", snap.timeline, snap.controller, false).every((r) => r.status === "pending")).toBe(true);
   });
 });

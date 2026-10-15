@@ -46,7 +46,7 @@ export class SoundManager {
         if (result.outcome === "invalid" || result.outcome === "bad-crc") this.play("reject");
         else this.play("tick");
       }),
-      bus.on("state", (s) => this.setFanLevel(s.tempClass === TEMP_CLASS.CRITICAL ? 2 : s.tempClass === TEMP_CLASS.WARM ? 1 : 0)),
+      bus.on("state", (s) => this.setFanLevel(s.tempClass >= TEMP_CLASS.HOT ? 2 : s.tempClass === TEMP_CLASS.WARM ? 1 : 0)),
       bus.on("restart", () => this.setFanLevel(0)),
     );
   }

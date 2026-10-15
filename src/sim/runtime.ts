@@ -5,18 +5,31 @@
  * Time only moves through `advance(dt)`, so playback is deterministic and pausing is exact.
  * React reads `getSnapshot()` (immutable, changes only on events); the game loop reads live fields.
  */
-import { RackSentinelController, TEMP_CLASS, resetBlockers, type ControllerState, type FrameResult, type ResetOutcome } from "./controller";
+import {
+  BLOCKER_REASON,
+  CFG,
+  CLASS_NAME,
+  RackSentinelController,
+  SETTINGS_MASK,
+  TEMP_CLASS,
+  resetBlockers,
+  settingsView,
+  type ControllerState,
+  type FrameResult,
+  type ResetOutcome,
+} from "./controller";
 import { EventBus, type Notice, type NoticeTone, type SimEvents, type TelemetryKind } from "./events";
-import { encodeSample } from "./protocol";
+import { CMD, CMD_NAME, causeText, encodeCommand, hexBytes, INPUT } from "./protocol";
 import { RecoveryCoordinator, type RecoveryPhase } from "./recovery";
 import { SCENARIOS, type Scenario, type ScenarioStep } from "./scenarios";
-import { RESET_ENTRY, digest, resetChain, telemetryChain, telemetryEntries, type CauseChain, type TimelineEntry } from "./timeline";
-import { ampsToRaw, degCToRaw, fmtAmps, fmtDegC, voltsToRaw } from "./units";
+import { RESET_ENTRY, digest, leakChain, resetChain, telemetryChain, telemetryEntries, type CauseChain, type TimelineEntry } from "./timeline";
+import { ampsToRaw, degCToRaw, fmtAmps, fmtDegC, fmtKW } from "./units";
 
+/** The rack as the DCIM measures it (raw sensor steps) plus the leak sensor. */
 export interface RawConditions {
-  voltRaw: number;
-  currentRaw: number;
   tempRaw: number;
+  currentRaw: number;
+  leak: boolean;
 }
 
 /** Something that can physically walk to P0 and press it (the scene's operator). */
@@ -38,6 +51,14 @@ export interface ScenarioStage {
   tone: NoticeTone;
 }
 
+export interface LastFrame {
+  kind: TelemetryKind;
+  outcome: FrameResult["outcome"];
+  frame: number[];
+  reply: number[];
+  at: number;
+}
+
 export interface SimSnapshot {
   version: number;
   controller: ControllerState;
@@ -45,7 +66,9 @@ export interface SimSnapshot {
   streaming: boolean;
   lastSampleAt: number | null;
   p0Down: boolean;
-  lastFrame: { kind: TelemetryKind; outcome: FrameResult["outcome"]; frame: number[]; reply: number[]; at: number } | null;
+  lastFrame: LastFrame | null;
+  /** The last data reply (STATUS, ENERGY, COUNTERS, TRIP_INFO). */
+  lastQuery: LastFrame | null;
   lastReset: { outcome: ResetOutcome; at: number } | null;
   resetBlockers: ResetOutcome[];
   scenario: { id: string; name: string; running: boolean; stage: ScenarioStage | null } | null;
@@ -60,6 +83,8 @@ export interface SimSnapshot {
 
 export const STREAM_PERIOD_MS = 3000;
 export const PRESS_HOLD_MS = 280;
+/** Time between readings when the terminal walks toward a new value. */
+export const RAMP_STEP_MS = 350;
 /** Time after the last scripted step before a scenario with nothing pending is complete. */
 export const SCENARIO_TAIL_MS = 1500;
 /** Minimum spacing between alerts reaching the HUD, so a burst stays readable. */
@@ -67,19 +92,23 @@ export const ALERT_GAP_MS = 1200;
 /** How long the "Scenario complete" line stays in the prompt bar. */
 const COMPLETE_STAGE_MS = 7000;
 /** Timeline entries kept per run. */
-const TIMELINE_MAX = 120;
+const TIMELINE_MAX = 160;
 
 export const RESET_MESSAGES: Record<ResetOutcome, { title: string; detail?: string; tone: NoticeTone }> = {
-  accepted: { title: "Reset accepted", detail: "Safe conditions verified · EPO request cleared", tone: "ok" },
-  "temperature-warm": { title: "Reset refused: temperature is still Warm", detail: "Temperature must be below 27.0 °C", tone: "warn" },
-  "temperature-critical": { title: "Reset refused: temperature is Critical", detail: "Temperature must be below 27.0 °C", tone: "alarm" },
-  "current-warning": { title: "Reset refused: current remains at warning level", detail: "Current must be below 25.6 A", tone: "warn" },
+  accepted: { title: "Reset accepted", detail: "Every cause is gone · power-off cleared", tone: "ok" },
+  leak: { title: "Reset refused: leak sensor still wet", detail: "P1 must be dry first", tone: "alarm" },
+  "temperature-critical": { title: "Reset refused: temperature is Critical", detail: "Temperature must be below the Critical threshold (35.0 °C)", tone: "alarm" },
+  runaway: { title: "Reset refused: latest reading was a runaway", detail: "A new reading without the steep rise is needed", tone: "warn" },
+  "config-fault": { title: "Reset refused: a setting is unreadable", detail: "The DCIM must rewrite the damaged setting", tone: "warn" },
   held: { title: "Reset refused: P0 was already held", detail: "Release P0 and press again", tone: "warn" },
-  "not-latched": { title: "Nothing to reset", detail: "No EPO request is latched", tone: "info" },
+  "not-latched": { title: "Nothing to reset", detail: "No power-off is latched", tone: "info" },
   released: { title: "P0 released", tone: "info" },
 };
 
-const NORMAL: RawConditions = { voltRaw: 230, currentRaw: 127, tempRaw: 53 };
+export const NORMAL: RawConditions = { tempRaw: 44, currentRaw: 100, leak: false }; // 22.0 °C, 20.0 A
+
+/** Whether the controller would accept a new P0 press right now (ignoring the button level). */
+export const canReset = (s: ControllerState) => s.epo && resetBlockers(s, false).length === 0;
 
 export class SimulationRuntime {
   readonly bus = new EventBus<SimEvents>();
@@ -98,12 +127,13 @@ export class SimulationRuntime {
   private nextStreamAt = 600;
   private tasks: { at: number; seq: number; run: () => void }[] = [];
   private taskSeq = 0;
+  private rampToken = 0;
   private scenario: { def: Scenario; running: boolean; stepsDone: boolean; stage: ScenarioStage | null; recovering: boolean } | null = null;
-  private lastFrame: SimSnapshot["lastFrame"] = null;
+  private lastFrame: LastFrame | null = null;
+  private lastQuery: LastFrame | null = null;
   private lastReset: SimSnapshot["lastReset"] = null;
   private notices: Notice[] = [];
   private noticeSeq = 0;
-  /** Simulation time the next alert may appear (see notify). */
   private nextNoticeAt = 0;
   private timeline: TimelineEntry[] = [];
   private chain: CauseChain | null = null;
@@ -144,6 +174,7 @@ export class SimulationRuntime {
       lastSampleAt: this.lastSampleAt,
       p0Down: this.p0Down,
       lastFrame: this.lastFrame,
+      lastQuery: this.lastQuery,
       lastReset: this.lastReset,
       resetBlockers: resetBlockers(c, this.p0Down),
       scenario: this.scenario
@@ -161,19 +192,14 @@ export class SimulationRuntime {
   advance(dtMs: number): void {
     if (this.paused || dtMs <= 0) return;
     const end = this.time + Math.min(dtMs, 250);
-    // Run due tasks in time order, letting tasks schedule more tasks inside the window.
     for (;;) {
       const nextTask = this.tasks.length ? this.tasks[0].at : Infinity;
       const nextStream = this.streaming ? this.nextStreamAt : Infinity;
       const next = Math.min(nextTask, nextStream);
       if (next > end) break;
       this.time = next;
-      if (nextStream <= nextTask) {
-        this.nextStreamAt = this.time + STREAM_PERIOD_MS;
-        this.transmit("sample");
-      } else {
-        this.tasks.shift()!.run();
-      }
+      if (nextStream <= nextTask) this.transmitReadings();
+      else this.tasks.shift()!.run();
       this.recovery.update();
     }
     this.time = end;
@@ -207,6 +233,7 @@ export class SimulationRuntime {
    */
   restart(opts: { keepScenario?: boolean; streaming?: boolean } = {}): void {
     this.tasks = [];
+    this.rampToken++;
     this.recovery.reset();
     this.agent?.cancel();
     this.controller.reset();
@@ -216,6 +243,7 @@ export class SimulationRuntime {
     this.p0Down = false;
     this.lastSampleAt = null;
     this.lastFrame = null;
+    this.lastQuery = null;
     this.lastReset = null;
     if (!opts.keepScenario) this.scenario = null;
     this.notices = [];
@@ -233,8 +261,8 @@ export class SimulationRuntime {
     this.scenario = { def, running: true, stepsDone: false, stage: null, recovering: false };
     this.restart({ keepScenario: true });
     this.agent?.returnToDesk();
-    this.notify(def.name, def.summary, "info");
-    this.setStage({ title: "Scenario started", detail: def.summary, tone: "info" });
+    this.notify(def.name, def.moment, "info");
+    this.setStage({ title: "Scenario started", detail: def.moment, tone: "info" });
     this.record({ kind: "scenario", title: `Scenario started · ${def.name}`, detail: `${def.testCase} · ${def.summary}`, tone: "info", focus: "room" });
     this.bus.emit("scenario", { id, phase: "start" });
     const last = def.steps.reduce((m, s) => Math.max(m, s.at), 0);
@@ -264,10 +292,10 @@ export class SimulationRuntime {
     if (!sc?.running || !sc.stepsDone || this.recovery.pending) return;
     const epo = this.controller.state.epo;
     const detail = epo
-      ? "EPO request still latched."
+      ? "Power-off still latched."
       : this.controller.state.epoTrips
-        ? "EPO request cleared by a new P0 press. Monitoring resumed."
-        : "No EPO request was latched, so no reset was needed.";
+        ? "Power-off cleared by a new P0 press. Monitoring resumed."
+        : "No power-off was latched, so no reset was needed.";
     sc.stage = { title: "Scenario complete", detail, tone: epo ? "warn" : "ok" };
     sc.running = false;
     this.record({ kind: "scenario", title: "Scenario completed", detail, tone: epo ? "warn" : "ok", focus: "room" });
@@ -296,17 +324,23 @@ export class SimulationRuntime {
   runStep(step: ScenarioStep, instant: boolean): void {
     switch (step.type) {
       case "conditions":
-        this.setConditions({ volts: step.volts ?? 230, amps: step.amps, degC: step.degC }, true);
+        this.setConditions({ amps: step.amps, degC: step.degC }, true);
         break;
       case "recover":
         this.externalRecovery(step);
         break;
       case "corrupt":
-        // The corrupted frame carries its own reading; the rack's real conditions are unchanged.
-        this.transmit("corrupt", { voltRaw: this.conditions.voltRaw, currentRaw: ampsToRaw(step.amps), tempRaw: degCToRaw(step.degC) });
+        // one DATA bit damaged on the wire: the CRC no longer matches
+        this.sendFrame("corrupt", CMD.TEMP, degCToRaw(step.degC), 0x01);
         break;
       case "invalid":
-        this.transmit("invalid");
+        this.sendFrame("invalid", CMD.TEMP, 0);
+        break;
+      case "command":
+        this.sendCommand(step.cmd, step.data);
+        break;
+      case "leak":
+        this.setLeak(step.wet);
         break;
       case "press":
         this.pressReset(!instant);
@@ -338,75 +372,99 @@ export class SimulationRuntime {
   }
 
   /**
-   * Simulated external recovery: the rack environment improves (cooling, load shed) and the DCIM
-   * terminal sends the new reading. RackSentinel only measures it; P5 never changes a reading.
+   * Simulated external recovery: the rack environment improves and the DCIM sends the new
+   * reading. RackSentinel only measures it; P5 never changes a reading.
    */
-  private externalRecovery(c: { volts?: number; amps: number; degC: number }): void {
+  private externalRecovery(c: { amps: number; degC: number }): void {
     const sc = this.scenario?.running ? this.scenario : null;
-    if (sc && !sc.recovering) this.notify("External rack conditions recovering", "Simulated environment change, sent as a new DCIM sample.", "info");
+    if (sc && !sc.recovering) this.notify("External rack conditions recovering", "Simulated environment change, sent as new DCIM readings.", "info");
     if (sc) sc.recovering = true;
-    this.setStage({ title: "External conditions recovering", detail: "Simulated rack environment. RackSentinel only measures it.", tone: "info" });
     this.recoveryReading = true;
     try {
-      this.setConditions({ volts: c.volts ?? 230, amps: c.amps, degC: c.degC }, true);
+      this.setConditions({ amps: c.amps, degC: c.degC }, true);
     } finally {
       this.recoveryReading = false;
     }
     const s = this.controller.state;
+    const blockers = resetBlockers(s, false);
     if (!s.epo) {
-      this.setStage({ title: "External conditions recovered", detail: `${fmtDegC(s.latestTemp)} · ${fmtAmps(s.latestCurrent)}. No EPO request, nothing to reset.`, tone: "ok" });
-    } else if (s.tempClass === TEMP_CLASS.CRITICAL) {
-      this.setStage({ title: `Temperature still Critical · ${fmtDegC(s.latestTemp)}`, detail: "EPO request remains latched.", tone: "alarm" });
-    } else if (s.latestCurrent > s.tripCurrent) {
-      this.setStage({ title: `Current still trips · ${fmtAmps(s.latestCurrent)}`, detail: "The current fault alone keeps the EPO request.", tone: "alarm" });
-    } else if (s.tempClass === TEMP_CLASS.WARM) {
-      this.setStage({ title: `Temperature remains Warm at ${fmtDegC(s.latestTemp)}`, detail: "Reset still blocked: temperature must be below 27.0 °C.", tone: "warn" });
-    } else if (s.overload) {
-      this.setStage({ title: `Current remains Warning at ${fmtAmps(s.latestCurrent)}`, detail: "Reset still blocked: current must be below 25.6 A.", tone: "warn" });
+      this.setStage({ title: "External conditions recovered", detail: `${fmtDegC(s.latestTemp)} · ${fmtAmps(s.latestCurrent)}. Nothing latched.`, tone: "ok" });
+    } else if (blockers.length) {
+      this.setStage({ title: `Cooling · ${fmtDegC(s.latestTemp)} · reset still blocked`, detail: `Blocked because ${BLOCKER_REASON[blockers[0]]}.`, tone: "alarm" });
     } else {
-      this.setStage({ title: "Conditions are now safe · EPO still latched", detail: "Safe readings alone do not clear P7. Operator acknowledgement required.", tone: "warn" });
+      this.setStage({ title: `${fmtDegC(s.latestTemp)} · ${CLASS_NAME[s.tempClass]} · power-off still latched`, detail: "Safe to reset, but readings alone do not clear P7. A person must press P0.", tone: "warn" });
     }
   }
 
   // ---------------------------------------------------------------- telemetry (DCIM → controller)
-  setConditions(c: { volts: number; amps: number; degC: number }, sendNow: boolean): void {
-    this.setRawConditions({ voltRaw: voltsToRaw(c.volts), currentRaw: ampsToRaw(c.amps), tempRaw: degCToRaw(c.degC) }, sendNow);
+  setConditions(c: { amps: number; degC: number }, sendNow: boolean): void {
+    this.setRawConditions({ ...this.conditions, currentRaw: ampsToRaw(c.amps), tempRaw: degCToRaw(c.degC) }, sendNow);
   }
 
-  setRawConditions(c: RawConditions, sendNow: boolean): void {
+  setRawConditions(c: Partial<RawConditions>, sendNow: boolean): void {
+    this.rampToken++;
     this.conditions = {
-      voltRaw: clampByte(c.voltRaw),
-      currentRaw: clampByte(c.currentRaw),
-      tempRaw: clampByte(c.tempRaw),
+      tempRaw: clampByte(c.tempRaw ?? this.conditions.tempRaw),
+      currentRaw: clampByte(c.currentRaw ?? this.conditions.currentRaw),
+      leak: c.leak ?? this.conditions.leak,
     };
-    if (sendNow) this.transmit("sample");
+    if (sendNow) this.transmitReadings();
     else this.changed();
+  }
+
+  /**
+   * Walk the readings toward a target one sensor step at a time, sending each step, like a room
+   * that heats or cools gradually. Stops if the conditions are changed some other way.
+   */
+  rampTo(target: { tempRaw?: number; currentRaw?: number }, stepMs = RAMP_STEP_MS): void {
+    const token = ++this.rampToken;
+    const tick = () => {
+      if (token !== this.rampToken) return;
+      const c = this.conditions;
+      const tT = target.tempRaw ?? c.tempRaw, tI = target.currentRaw ?? c.currentRaw;
+      const tempRaw = c.tempRaw + Math.sign(tT - c.tempRaw);
+      // current may move faster: up to 5 steps (1 A) per reading
+      const currentRaw = c.currentRaw + Math.max(-5, Math.min(5, tI - c.currentRaw));
+      this.conditions = { ...c, tempRaw, currentRaw };
+      this.transmitReadings();
+      this.rampToken = token; // transmitReadings does not change the token; keep walking
+      if (tempRaw !== tT || currentRaw !== tI) this.schedule(stepMs, tick);
+    };
+    tick();
   }
 
   setStreaming(on: boolean): void {
     if (this.streaming === on) return;
     this.streaming = on;
     this.nextStreamAt = this.time + (on ? 400 : 0);
-    this.record({ kind: "link", title: on ? "Telemetry link resumed" : "Telemetry link silent", detail: on ? undefined : "Controller holds its last valid state.", tone: on ? "info" : "warn", focus: "desk" });
-    if (on) this.notify("Telemetry resumed", "The DCIM terminal is sending samples again.", "info");
-    else this.notify("Telemetry stopped", "Controller holds its last valid state. P0 still works locally.", "warn");
+    this.record({ kind: "link", title: on ? "Telemetry link resumed" : "Telemetry link silent", detail: on ? undefined : "Controller holds its last state; P0 and P1 are still watched.", tone: on ? "info" : "warn", focus: "desk" });
+    if (on) this.notify("Telemetry resumed", "The DCIM is sending readings again.", "info");
+    else this.notify("Telemetry stopped", "Controller holds its last state. P0 and the leak sensor still work locally.", "warn");
     this.changed();
   }
 
-  /** Send one packet from the DCIM terminal and process the controller's reply. */
-  transmit(kind: TelemetryKind, reading: RawConditions = this.conditions): FrameResult {
-    const { voltRaw, currentRaw, tempRaw } = reading;
-    const frame =
-      kind === "invalid"
-        ? encodeSample(voltRaw, currentRaw, 0) // temperature raw 0 is a sensor fault
-        : encodeSample(voltRaw, currentRaw, tempRaw, kind === "corrupt");
-    if (kind === "sample" && this.streaming) this.nextStreamAt = this.time + STREAM_PERIOD_MS;
+  /** One DCIM reading cycle: a TEMP packet, then a CURRENT packet. */
+  transmitReadings(): void {
+    if (this.streaming) this.nextStreamAt = this.time + STREAM_PERIOD_MS;
+    this.sendFrame("temp", CMD.TEMP, this.conditions.tempRaw);
+    this.sendFrame("current", CMD.CURRENT, this.conditions.currentRaw);
+  }
 
+  /** A DCIM command: a setting, a query or the ECC self-test. */
+  sendCommand(cmd: number, data: number): FrameResult {
+    return this.sendFrame("command", cmd, data);
+  }
+
+  /** Send one 4-byte packet from the DCIM terminal and process the controller's reply. */
+  sendFrame(kind: TelemetryKind, cmd: number, data: number, corruptData = 0): FrameResult {
+    const frame = encodeCommand(cmd, data, corruptData);
     const before = this.controller.snapshot();
     const result = this.controller.receiveFrame(frame);
     const after = this.controller.snapshot();
     this.lastSampleAt = this.time;
-    this.lastFrame = { kind, outcome: result.outcome, frame: result.frame, reply: result.reply, at: this.time };
+    const lf: LastFrame = { kind, outcome: result.outcome, frame: result.frame, reply: result.reply, at: this.time };
+    this.lastFrame = lf;
+    if (result.outcome === "data") this.lastQuery = lf;
     if (!this.quiet) {
       this.bus.emit("telemetry", { kind, result });
       for (const e of telemetryEntries(kind, result, before, after, this.recoveryReading)) this.record(e);
@@ -419,57 +477,100 @@ export class SimulationRuntime {
     return result;
   }
 
+  // ---------------------------------------------------------------- the leak sensor (P1)
+  setLeak(wet: boolean): void {
+    if (this.conditions.leak === wet && !!(this.controller.state.inputs & INPUT.LEAK) === wet) return;
+    this.conditions = { ...this.conditions, leak: wet };
+    const before = this.controller.snapshot();
+    const r = this.controller.setLeak(wet);
+    const after = this.controller.snapshot();
+    if (!this.quiet) {
+      this.bus.emit("leak", { wet });
+      this.record({ kind: "leak", title: wet ? "P1 leak sensor wet" : "P1 leak sensor dry", tone: wet ? "alarm" : "info", focus: "rack" });
+      if (r.leakTrip) {
+        this.bus.emit("trip", { cause: 0x04 });
+        this.record({ kind: "epo", title: "P7 power-off latched", detail: `Cause: water leak. Trip ${after.epoTrips}. No UART message needed.`, tone: "alarm", focus: "rack" });
+      }
+      const nodes = leakChain(wet, r.leakTrip, after);
+      if (nodes) this.setChain("leak", nodes, before, after);
+    }
+    if (r.leakTrip) {
+      this.notify("Water leak · power-off latched", "P1 is wet. The chip cut power by itself, with no message on the link.", "alarm");
+      this.setStage({ title: "Water on P1 · power-off latched", detail: "Reset is refused while the sensor is wet.", tone: "alarm" });
+    } else if (wet) {
+      this.notify("Leak sensor wet", "Power-off already latched. Reset is refused while P1 is wet.", "warn");
+    } else {
+      this.notify("Leak sensor dry", after.epo ? "Power-off stays latched until a person presses P0." : "Nothing latched.", after.epo ? "warn" : "info");
+    }
+    this.bus.emit("state", after);
+    this.changed();
+  }
+
   private describeTransition(b: ControllerState, a: ControllerState, r: FrameResult): void {
     if (r.outcome === "invalid") {
-      this.notify("Telemetry rejected (0x3C)", "Invalid reading. Readings, outputs and the EPO latch are unchanged.", "warn");
+      this.notify("Rejected (3C)", r.notes.at(-1)?.text ?? "Invalid command or value. Nothing changed.", "warn");
       return;
     }
     if (r.outcome === "bad-crc") {
-      this.notify("Corrupted message rejected (0x5A)", "Bad CRC. Nothing was acted on; the reject counter went up.", "warn");
+      this.notify("Damaged packet rejected (5A)", "Bad CRC. Nothing was acted on; the reject counter went up.", "warn");
       return;
     }
-    if (r.outcome !== "accepted") return;
+    if (r.outcome === "data") {
+      this.notify(`${CMD_NAME[r.command]} reply`, hexBytes(r.reply), "info");
+      return;
+    }
+    if (r.command === CMD.FLIP_TEST) {
+      this.notify("ECC self-test", r.notes.at(-1)?.text ?? "Bits flipped in memory.", "warn");
+      return;
+    }
+    if (r.command !== CMD.TEMP && r.command !== CMD.CURRENT) {
+      this.notify(`${CMD_NAME[r.command] ?? "Command"} accepted`, r.notes.at(-1)?.text, "info");
+      return;
+    }
 
-    const tripCurrent = a.latestCurrent > a.tripCurrent;
-    const tripTemp = a.tempClass === TEMP_CLASS.CRITICAL;
+    if (a.eccCorrected > b.eccCorrected) {
+      if (!this.quiet) this.bus.emit("warning", { what: "ecc" });
+      this.notify("Memory error corrected", "One flipped bit in a setting was repaired at its next use and written back.", "ok");
+    }
     if (!b.epo && a.epo) {
-      if (!this.quiet) this.bus.emit("trip", { temperature: tripTemp, current: tripCurrent });
-      const cause = [tripTemp && `critical temperature ${fmtDegC(a.latestTemp)}`, tripCurrent && `current trip ${fmtAmps(a.latestCurrent)}`]
-        .filter(Boolean)
-        .join(" + ");
-      this.notify("EPO request latched", `P7 on: ${cause}. Safe readings alone will not clear it.`, "alarm");
-      if (tripTemp) this.setStage({ title: "Maximum fan requested (P5) · EPO latched", detail: "Temperature remains controlled by external rack conditions.", tone: "alarm" });
-      else this.setStage({ title: "Current trip · EPO request latched", detail: "Current is set by the external load. P7 stays latched.", tone: "alarm" });
+      const cause = settingsView(a)[CFG.TRIP_CAUSE].value;
+      if (!this.quiet) this.bus.emit("trip", { cause });
+      this.notify("Power-off latched", `P7 on: ${causeText(cause)}. Safe readings alone will not clear it.`, "alarm");
+      this.setStage({ title: `Power-off latched · ${causeText(cause)}`, detail: "The trip record saves the cause, temperature and current.", tone: "alarm" });
       return;
     }
-    if (a.tempClass !== b.tempClass) {
-      if (a.tempClass === TEMP_CLASS.WARM && a.epo && b.tempClass === TEMP_CLASS.CRITICAL) {
-        this.notify(`Temperature remains Warm at ${fmtDegC(a.latestTemp)}`, "P4 fan boost. Reset still blocked: EPO request remains latched.", "warn");
-      } else if (a.tempClass === TEMP_CLASS.WARM) {
+    if ((a.fault & SETTINGS_MASK) && !(b.fault & SETTINGS_MASK)) {
+      this.notify("Setting unreadable", "Two flipped bits. The chip fails safe until the DCIM rewrites the setting.", "alarm");
+    }
+    if (a.rapid && !b.rapid && a.epo) {
+      if (!this.quiet) this.bus.emit("warning", { what: "runaway" });
+      this.notify("Thermal runaway", `A rise of ${fmtDegC(a.latestTemp - b.latestTemp)} in one reading. Reset blocked until the rise stops.`, "warn");
+    }
+    if (a.tempClass !== b.tempClass && r.command === CMD.TEMP) {
+      const t = fmtDegC(a.latestTemp);
+      if (a.tempClass === TEMP_CLASS.WARM) {
         if (!this.quiet && b.tempClass === TEMP_CLASS.NORMAL) this.bus.emit("warning", { what: "warm" });
-        this.notify(`Rack Warm · ${fmtDegC(a.latestTemp)}`, "P4 fan boost requested.", "warn");
+        this.notify(`Rack Warm · ${t}`, a.epo ? "P4 fan boost. Power-off remains latched." : "P4 fan boost requested.", "warn");
+      } else if (a.tempClass === TEMP_CLASS.HOT) {
+        if (!this.quiet && b.tempClass < TEMP_CLASS.HOT) this.bus.emit("warning", { what: "hot" });
+        this.notify(`Rack Hot · ${t}`, a.epo ? "P5 fans at maximum. Power-off remains latched." : "P5 fans at maximum. No power-off below Critical.", "warn");
       } else if (a.tempClass === TEMP_CLASS.CRITICAL) {
-        this.notify(`Temperature Critical · ${fmtDegC(a.latestTemp)}`, "P5 maximum fan requested. EPO request remains latched.", "alarm");
+        this.notify(`Temperature Critical · ${t}`, "Power-off remains latched.", "alarm");
       } else {
-        this.notify(`Temperature Normal · ${fmtDegC(a.latestTemp)}`, a.epo ? "Fan requests off. EPO request remains latched." : "Fan requests off.", "info");
+        this.notify(`Temperature Normal · ${t}`, a.epo ? "Fans normal. Power-off remains latched." : "Fans normal.", "info");
       }
     }
-    if (a.epo && b.latestCurrent > b.tripCurrent && a.overload && a.latestCurrent <= a.tripCurrent) {
-      this.notify(`Current remains Warning at ${fmtAmps(a.latestCurrent)}`, "No longer a trip, but reset stays blocked until current is below 25.6 A.", "warn");
-    }
-    if (a.overload !== b.overload) {
+    if (a.overload !== b.overload && r.command === CMD.CURRENT) {
       if (a.overload) {
-        if (!this.quiet) this.bus.emit("warning", { what: "current" });
-        this.notify(`Current warning · ${fmtAmps(a.latestCurrent)}`, "P6 current warning on (at or above 25.6 A).", "warn");
+        if (!this.quiet) this.bus.emit("warning", { what: "overload" });
+        this.notify(`Power overload · ${fmtKW(a.power ?? 0)}`, "P6 alarm: at or above the power limit. A warning, not a power-off.", "warn");
       } else {
-        this.notify(`Current below warning · ${fmtAmps(a.latestCurrent)}`, "P6 current warning off.", "info");
+        this.notify(`Power below the limit · ${fmtKW(a.power ?? 0)}`, "P6 alarm off.", "info");
       }
     }
-    const safe = (s: ControllerState) => s.tempClass === TEMP_CLASS.NORMAL && !s.overload;
-    if (a.epo && safe(a) && !safe(b)) {
-      // The firmware polls P0 continuously; a button that is still down never makes a new edge.
-      if (this.p0Down) this.notify(RESET_MESSAGES.held.title, `Readings are safe. ${RESET_MESSAGES.held.detail}.`, "warn");
-      else this.notify("Conditions are now safe · EPO request remains latched", "Operator acknowledgement required: a new P0 press at the rack.", "warn");
+    if (a.epo && canReset(a) && !canReset(b) && r.command === CMD.TEMP) {
+      if (this.p0Down) this.notify(RESET_MESSAGES.held.title, `Safe to reset. ${RESET_MESSAGES.held.detail}.`, "warn");
+      else this.notify("Safe to reset · power-off remains latched", "Operator acknowledgement required: a new P0 press at the rack.", "warn");
     }
   }
 
@@ -493,10 +594,11 @@ export class SimulationRuntime {
   buttonDown(fromOperator = false): void {
     const wasDown = this.p0Down;
     this.p0Down = true;
-    const attempt = this.controller.setP0(true);
+    const before = this.controller.snapshot();
+    const poll = this.controller.setP0(true);
     if (!this.quiet) this.bus.emit("button", { down: true });
     if (fromOperator) this.recovery.onOperatorPress();
-    if (!wasDown || attempt.newPress) this.recordReset(attempt.outcome, fromOperator);
+    if (poll.reset && (!wasDown || poll.newPress)) this.recordReset(poll.reset, before, fromOperator);
     this.bus.emit("state", this.controller.snapshot());
     this.changed();
   }
@@ -509,25 +611,23 @@ export class SimulationRuntime {
     this.changed();
   }
 
-  private recordReset(outcome: ResetOutcome, fromOperator = false): void {
+  private recordReset(outcome: ResetOutcome, before: ControllerState, fromOperator = false): void {
     this.lastReset = { outcome, at: this.time };
+    const s = this.controller.state;
+    const holdOpen = outcome === "not-latched" && this.scenario?.def.id === "held-button";
     if (!this.quiet) {
       this.bus.emit("reset", { outcome });
-      const s = this.controller.state;
       const e = RESET_ENTRY[outcome];
-      const quietHold = outcome === "not-latched" && this.scenario?.def.id === "held-button";
-      if (e && !quietHold) this.record({ kind: "reset", title: e.title, tone: e.tone, focus: "button", reset: outcome });
+      if (e && !holdOpen) this.record({ kind: "reset", title: e.title, tone: e.tone, focus: "button", reset: outcome });
       const nodes = resetChain(outcome, s);
-      // the press itself changed only the latch: "before" is the same state with P7 still on
-      if (nodes) this.setChain("reset", nodes, { ...digest(s, this.p0Down), epo: true, pins: s.pins | (outcome === "accepted" ? 0x80 : 0) }, digest(s, this.p0Down));
+      if (nodes) this.setChain("reset", nodes, before, s);
     }
-    const m = RESET_MESSAGES[outcome];
-    // A hold that starts with nothing latched is not a reset attempt worth announcing.
-    if (outcome === "not-latched" && this.scenario?.def.id === "held-button") {
+    if (holdOpen) {
       this.notify("P0 held down", "The reset button is stuck in the pressed position.", "info");
       this.setStage({ title: "P0 held down", detail: "The reset button is stuck in the pressed position.", tone: "info" });
       return;
     }
+    const m = RESET_MESSAGES[outcome];
     this.notify(m.title, m.detail, m.tone);
     if (outcome !== "accepted" && outcome !== "not-latched") this.setStage({ title: m.title, detail: m.detail, tone: m.tone });
     this.recovery.onReset(outcome, fromOperator);
@@ -540,17 +640,14 @@ export class SimulationRuntime {
     this.timeline = [...this.timeline.slice(-(TIMELINE_MAX - 1)), entry];
   }
 
-  private setChain(kind: CauseChain["kind"], nodes: CauseChain["nodes"], before: ControllerState | CauseChain["before"], after: ControllerState | CauseChain["after"]): void {
-    const d = (s: ControllerState | CauseChain["before"]) => ("latestTemp" in s ? digest(s, this.p0Down) : s);
-    this.chain = { id: ++this.recordSeq, at: this.time, kind, nodes, before: d(before), after: d(after) };
+  private setChain(kind: CauseChain["kind"], nodes: CauseChain["nodes"], before: ControllerState, after: ControllerState): void {
+    this.chain = { id: ++this.recordSeq, at: this.time, kind, nodes, before: digest(before, this.p0Down), after: digest(after, this.p0Down) };
   }
 
   // ---------------------------------------------------------------- notices
   /**
-   * Raise an alert. A single sample can raise several at once (a class change, then "conditions
-   * are now safe", then the reset prompt); they are released at least ALERT_GAP_MS apart on the
-   * simulation clock so each is readable and a burst does not flash past. `at` stays the moment
-   * the event happened, so the log timestamps stay truthful.
+   * Raise an alert. Alerts are released at least ALERT_GAP_MS apart on the simulation clock so
+   * each is readable; `at` stays the moment the event happened.
    */
   notify(title: string, detail: string | undefined, tone: NoticeTone): void {
     if (this.quiet) return;
@@ -563,7 +660,6 @@ export class SimulationRuntime {
 
   private pushNotice(title: string, detail: string | undefined, tone: NoticeTone, at: number): void {
     const n: Notice = { id: ++this.noticeSeq, title, detail, tone, at };
-    // kept deeper than the HUD shows, so a queued alert is never dropped before it appears
     this.notices = [...this.notices.slice(-9), n];
     this.bus.emit("notice", n);
     this.changed();

@@ -5,14 +5,14 @@ import { FOCUS } from "./camera";
 import { BG_LEDS, buildStatic, drawBackgroundLeds, drawMonitor, drawRackDynamic, type RackLook } from "./world";
 
 const LOOK: RackLook = {
-  time: 0, tempClass: 0, overload: false, epo: false, fanAngle: 0, fanLevel: 0, ledRate: 1, flash: false,
-  capPressed: false, capHeld: false, monitorState: "ok", monitorEpo: false, readings: { v: 230, i: 127, t: 53, got: true }, linkSilent: false,
+  time: 0, tempClass: 0, pins: 0, overload: false, epo: false, leak: false, fanAngle: 0, fanLevel: 0, ledRate: 1, flash: false,
+  capPressed: false, capHeld: false, monitorState: "ok", monitorEpo: false, readings: { v: 230, i: 100, t: 44, got: true }, linkSilent: false,
   heartbeat: true, link: 1, glitch: false,
 };
-/** Every output on: Critical, current trip, EPO latched, P0 pressed. */
+/** Every output on: Critical, overload, power-off latched, leak, P0 pressed. */
 const ALARM: RackLook = {
-  ...LOOK, tempClass: 3, overload: true, epo: true, fanLevel: 2, fanAngle: 1.3, flash: true, capPressed: true,
-  monitorState: "crit", monitorEpo: true, readings: { v: 230, i: 161, t: 65, got: true },
+  ...LOOK, tempClass: 3, pins: 0xe0, overload: true, epo: true, leak: true, fanLevel: 2, fanAngle: 1.3, flash: true, capPressed: true,
+  monitorState: "crit", monitorEpo: true, readings: { v: 230, i: 130, t: 70, got: true },
 };
 const QUALITIES: Quality[] = ["performance", "balanced", "sharp"];
 

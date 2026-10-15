@@ -4,11 +4,14 @@
 src/
   sim/        deterministic model: no DOM, no rendering, fully unit-tested
     crc.ts         CRC-16/CCITT (0x1021, init 0xFFFF), as the `crcb` instruction
-    protocol.ts    frame encoders, command/reply/pin/status constants
-    controller.ts  RackSentinelController: port of main.s (frames in, replies + pins out, P0 polls)
-    units.ts       raw-step conversions (1 V, 0.2 A, 0.5 °C)
+    ecc.ts         SECDED Hamming(12,8) + parity, bit-for-bit as ecc_encode / ecc_decode
+    protocol.ts    4-byte frame encoder, command/reply/pin/status/cause constants
+    controller.ts  RackSentinelController: the v2 firmware (frames in, replies + pins out, P0/P1 polls)
+    emu.ts         the organisers' ./emu command line interpreted against the controller
+    cases.ts       data-flow cases: R1 to R9 verbatim from the FPGA plus generated extras
+    units.ts       raw-step conversions (0.2 A, 0.5 °C), power, energy (Wh = mulhu(E, 0xDA740DA8) >> 8)
     events.ts      typed EventBus and the SimEvents vocabulary
-    scenarios.ts   13 timed scenarios (step lists), including external recovery and operator acknowledgement
+    scenarios.ts   13 timed scenarios (Ali's day: R1 to R9 plus four extras), with external recovery and acknowledgement
     recovery.ts    RecoveryCoordinator: when to send the operator to P0, result hold, scenario completion
     runtime.ts     SimulationRuntime: clock, telemetry stream, scenario playback, notices, React store
     demo.ts        GuidedDemo: beats built from scenario steps, instant rebuild for "back"
@@ -29,16 +32,16 @@ src/
 ## Data flow
 
 1. **Time** moves only through `SimulationRuntime.advance(dt)`, called by the game loop. Pause stops it, and hidden tabs stop the loop entirely. Scenarios and the telemetry stream are scheduled on this clock, so playback is deterministic and testable without a browser.
-2. **Telemetry**: `runtime.transmit()` encodes a real SAMPLE frame (with CRC) from the simulated rack conditions and feeds it to the controller. It emits `telemetry`, `trip`, `warning`, `notice` and `state` events.
-3. **P0**: the operator's press animation calls `runtime.buttonDown()` and `buttonUp()`. Each level change runs the firmware's `check_reset` poll, which reports `accepted` or a specific refusal.
+2. **Telemetry**: every reading cycle `runtime.transmitReadings()` sends a real TEMP packet, then a CURRENT packet (4 bytes each, with CRC). DCIM commands go through `runtime.sendCommand()`. Both emit `telemetry`, `trip`, `warning`, `notice` and `state` events.
+3. **Inputs**: the operator's press animation calls `runtime.buttonDown()` and `buttonUp()`; `runtime.setLeak()` drives P1. Each level change runs the firmware's `check_inputs` poll: a wet sensor latches P7 (`trip` with cause 0x04), a new P0 press reports `accepted` or a specific refusal.
 4. **React** reads an immutable snapshot through `useSyncExternalStore`. The snapshot changes only on events, never per frame. Continuous values (fan angle, operator position, camera) live in the game loop. DOM overlays are positioned by writing `transform` directly.
 5. **Scene** derives everything visible from `runtime.controller.state` every frame. The rack shows what the controller requests; a heat shimmer reflects the external condition.
 
 ## Scenario recovery
 
-RackSentinel has no thermal model and no actuators: P5 requests maximum fans but never changes a reading. A scenario recovers only through `recover` steps, which change the simulated rack environment and send a new SAMPLE through the DCIM path, exactly like any other telemetry.
+RackSentinel has no thermal model and no actuators: P5 requests maximum fans but never changes a reading. A scenario recovers only through `recover` steps, which change the simulated rack environment and send new readings through the DCIM path, exactly like any other telemetry. Temperature always moves one 0.5 °C step per reading, except in the cooling-failure scenario, which jumps on purpose.
 
-When a scenario reaches an `acknowledge` step, `RecoveryCoordinator` arms. It sends the operator to P0 only when the EPO is latched, a valid temperature has been received, temperature is Normal, current is below the warning level, P0 is not held, and the operator is idle; and only after safe readings have been visible with P7 still latched for `dwell` ms (2 s by default). It acts solely through `runtime.pressReset()`, the same walk-and-press as a user's click, so the controller accepts or refuses the press by its normal rules. A refusal returns it to waiting; a manual press that clears the EPO first calls the operator off. After an accepted reset the result stays on screen for 2 s, the operator returns to the desk and the scenario completes. `restart()` and starting another scenario cancel pending steps, the coordinator and the operator, and release P0.
+When a scenario reaches an `acknowledge` step, `RecoveryCoordinator` arms. It sends the operator to P0 only when the power-off is latched, a valid temperature has been received, the controller would accept a reset (below Critical, no runaway on the latest reading, leak sensor dry, no unreadable setting), P0 is not held, and the operator is idle; and only after safe readings have been visible with P7 still latched for `dwell` ms (2 s by default). It acts solely through `runtime.pressReset()`, the same walk-and-press as a user's click, so the controller accepts or refuses the press by its normal rules. A refusal returns it to waiting; a manual press that clears the EPO first calls the operator off. After an accepted reset the result stays on screen for 2 s, the operator returns to the desk and the scenario completes. `restart()` and starting another scenario cancel pending steps, the coordinator and the operator, and release P0.
 
 The `stage` of the running scenario (what it is demonstrating right now) is part of the snapshot and shown in the prompt bar, the compact bar above the Scenarios toggle on narrower screens, and the observer view.
 
@@ -97,3 +100,10 @@ Every visible reaction follows a real controller event; nothing ambient implies 
 - **Director.** `Game.direct()` frames the incident's object with centred `incident*` framings, holding each for `FOLLOW_HOLD_S`. Off with C, under reduced motion, in observer mode and while a user panel is open.
 - **Operator.** On a trip: look at the monitor → turn toward the rack → stand (chair rolls back) → walk to the inspection point. Acknowledgement walks on to P0, pauses, reaches, presses; after an accepted reset they check the rack on the way back to the desk.
 - **Presentation (P), focus labels (L), screenshot presets (H), demo captions.** Pure view state in `TwinApp`.
+
+## Explainer pages
+
+`src/app/features/page.tsx` and `src/app/data-flow/page.tsx` are static routes inside `SiteShell` (`src/components/site/`), styled by `src/app/site.css` with the same tokens as the twin. They import the simulation layer directly:
+
+- `components/features/demos.tsx` drives every mini-demo from `controller.ts`, `ecc.ts` and `crc.ts`, so the numbers shown are computed, not written by hand.
+- `components/flow/DataFlowPage.tsx` runs a case's `./emu` line through `emu.ts` and shows each step's packet, CRC trace, firmware notes (`Note[]` from the controller), reply, pins and resulting state.

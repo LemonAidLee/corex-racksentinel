@@ -11,22 +11,25 @@ export interface Notice {
   at: number;
 }
 
-export type TelemetryKind = "sample" | "corrupt" | "invalid";
+/** What kind of packet the DCIM terminal sent. */
+export type TelemetryKind = "temp" | "current" | "command" | "corrupt" | "invalid";
 
 /** Everything the simulation announces. Scene, sound, UI and accessibility layers subscribe. */
 export interface SimEvents {
   /** A packet travelled from the DCIM terminal to the controller and was processed. */
   telemetry: { kind: TelemetryKind; result: FrameResult };
-  /** A new EPO latch (P7 rising). */
-  trip: { temperature: boolean; current: boolean };
-  /** A warning-level change that the operator should notice (warm or current warning newly active). */
-  warning: { what: "warm" | "current" };
+  /** A new EPO latch (P7 rising), with the trip cause bit mask. */
+  trip: { cause: number };
+  /** A warning-level change that the operator should notice. */
+  warning: { what: "warm" | "hot" | "overload" | "runaway" | "ecc" };
+  /** The leak sensor (P1) changed level. */
+  leak: { wet: boolean };
   /** A P0 press was evaluated. */
   reset: { outcome: ResetOutcome };
   /** P0 level changed. */
   button: { down: boolean };
   notice: Notice;
-  /** Controller state changed (cheap: fired after packets and P0 polls). */
+  /** Controller state changed (cheap: fired after packets and input polls). */
   state: ControllerState;
   scenario: { id: string; phase: "start" | "end" };
   /** The simulation was restarted from power-on. */
