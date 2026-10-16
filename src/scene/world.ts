@@ -543,6 +543,13 @@ export interface RackLook {
   epo: boolean;
   /** Water on the leak sensor (P1). */
   leak: boolean;
+  /**
+   * Power to the eight servers, 0..1. It falls to 0 while the EPO has cut the rack and is eased,
+   * so the servers go dark one unit at a time on a trip and boot one unit at a time on recovery.
+   * The controller's own panel (P4–P7 lamps, class bar, beacon) is not on this feed: it stays lit
+   * because it must keep running to hold the latch.
+   */
+  power: number;
   fanAngle: number;
   fanLevel: 0 | 1 | 2; // 0 normal, 1 boost (P4), 2 max (P5)
   ledRate: number;
@@ -607,28 +614,33 @@ function doorTex(L: RackLook): Tex {
       const on = L.tempClass === 0 ? true : L.tempClass === 1 ? idx % 3 !== 2 : L.tempClass === 2 ? idx % 2 === 0 : idx % 4 < 1;
       return on ? bar | EMISSIVE : shade(bar, 0.3);
     }
-    // eight 1U servers
+    // eight 1U servers: unpowered units go dark, top unit first to come back, last to go
     if (v < 51) {
       const unit = Math.floor((v - 19) / 4), rv = (v - 19) % 4;
+      const lit = L.power > (unit + 1) / 9;
+      const body = lit ? PAL.serverFace : shade(PAL.serverFace, 0.5);
       if (rv < 0.5) return PAL.serverLine;
       if (u < 2.25 || u >= w - 2.25) {
         // rack ears with pull handles
         const handle = (u >= 1.1 && u < 1.6) || (u >= w - 1.6 && u < w - 1.1);
-        return handle && rv > 1 && rv < 3.5 ? PAL.steelLight : shade(PAL.serverFace, 0.85);
+        return handle && rv > 1 && rv < 3.5 ? PAL.steelLight : shade(body, 0.85);
       }
       if (rv >= 1.6 && rv < 2.6 && ((u >= 19.5 && u < 20.5) || (u >= 21.5 && u < 22.5))) {
+        if (!lit) return PAL.ledOff;
         const on = hash2(unit, ledStep + Math.floor(u), 7) > 0.45;
         return on ? PAL.ledIdle | EMISSIVE : PAL.ledOff;
       }
-      if (u >= 3 && u < 12.5 && rv >= 1.25 && rv < 3.25) {
-        const hu = frac((u - 3) / 1.2), hv = frac(rv - 1.25);
-        return hu > 0.3 && hu < 0.75 && hv > 0.25 && hv < 0.75 ? PAL.vent : PAL.serverFace;
+      // steady power LED: the clearest "this server is on" sign, and the first thing to go dark
+      if (u >= 3 && u < 4 && rv >= 1.6 && rv < 2.6) return lit ? PAL.ledIdle | EMISSIVE : PAL.ledOff;
+      if (u >= 4.6 && u < 12.5 && rv >= 1.25 && rv < 3.25) {
+        const hu = frac((u - 4.6) / 1.2), hv = frac(rv - 1.25);
+        return hu > 0.3 && hu < 0.75 && hv > 0.25 && hv < 0.75 ? PAL.vent : body;
       }
       if (u >= 13.5 && u < 18.5 && rv >= 1 && rv < 3.5) {
         const bayEdge = u < 13.5 + t || u >= 18.5 - t || rv < 1 + t || rv >= 3.5 - t || Math.abs(u - 16) < t / 2;
-        return bayEdge ? PAL.serverLine : shade(PAL.serverFace, 1.12);
+        return bayEdge ? PAL.serverLine : shade(body, lit ? 1.12 : 0.92);
       }
-      return PAL.serverFace;
+      return body;
     }
     // fan bank: two housings with corner screws
     if (v < 75) {

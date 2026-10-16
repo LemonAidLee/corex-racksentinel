@@ -505,6 +505,8 @@ export class Game {
       overload: s.overload,
       epo: s.epo,
       leak,
+      // the EPO cuts the servers' feed: eased with the room mood, so they die fast and boot in stages
+      power: 1 - this.mood.epo,
       fanAngle: this.fanAngle,
       fanLevel,
       ledRate: this.reducedMotion ? 1 : 5,
@@ -621,6 +623,8 @@ export class Game {
       if (this.reducedMotion) pool(103, 40, 0, 26, 13, PAL.crit, 0.06 * m.epo, 2);
       else pool(103 + Math.cos(this.beaconAngle) * 30, 42 + Math.sin(this.beaconAngle) * 16, 0, 22, 11, PAL.crit, 0.11 * m.epo, 2);
     }
+    // powered servers give Rack 01's face a faint cool glow; it drains away when the EPO cuts them
+    pool(100, 22, 40, 14, 30, PAL.ledIdle, 0.06 * L.power, 2, OBJ.RACK);
     // P6 power overload: the amber lamp lights its surroundings
     pool(AMBER_LAMP.x + 3, AMBER_LAMP.y + 3, 78, 40, 22, PAL.warn, 0.13 * m.current, 3);
     // water on the floor in front of the rack reflects a cold blue
