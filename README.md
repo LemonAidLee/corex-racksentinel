@@ -112,9 +112,15 @@ Details and how each number is reproduced: **[docs/11](docs/11-verification.md)*
 
 ## Digital twin
 
-[`racksentinel-twin/`](racksentinel-twin/) is a browser digital twin of RackSentinel v2 (Next.js, TypeScript, Vitest): a pixel-art operator room with a DCIM terminal, thirteen deterministic scenarios (nine matching the FPGA runs one to one), a guided demo, a `/features` page and a `/data-flow` page that walks each test case byte by byte, including the `crcb` CRC trace.
+[`racksentinel-twin/`](racksentinel-twin/) is an interactive browser twin of RackSentinel v2, built with Next.js, TypeScript and Vitest. It opens into a pixel-art operator room: an operator at a DCIM terminal, a row of server racks, a floor leak sensor and a physical P0 reset button. Only Rack 01 is controlled by RackSentinel.
 
-The controller model is a port of the v2 firmware, and its unit tests replay every step of the nine FPGA runs and 1,000 cases replayed on the RTL, so a single wrong byte fails the build.
+| Route | What it shows |
+|---|---|
+| `/` | The operator room, 13 deterministic scenarios (9 match the FPGA runs R1 to R9 one to one), a guided demo and the DCIM terminal for sending real packets |
+| `/features` | Eleven feature cards in plain words, each with a live mini-demo |
+| `/data-flow` | Every test case byte by byte: packets, the `crcb` CRC trace, firmware decisions, replies, pins and the matching FPGA screenshot |
+
+**Why it can be trusted.** The controller model is a port of the v2 firmware. Its unit tests replay every step of the nine FPGA runs and 1,000 cases replayed on the RTL, so a single wrong byte fails the build. It is a simulation only, not connected to a rack or an FPGA.
 
 ```bash
 cd racksentinel-twin
@@ -123,7 +129,7 @@ npm run dev        # http://localhost:3000
 npm test
 ```
 
-Architecture notes: [`racksentinel-twin/ARCHITECTURE.md`](racksentinel-twin/ARCHITECTURE.md)
+Details: [`racksentinel-twin/README.md`](racksentinel-twin/README.md) · [`ARCHITECTURE.md`](racksentinel-twin/ARCHITECTURE.md)
 
 ---
 
