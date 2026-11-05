@@ -1,0 +1,18 @@
+% Table 6 -- Verification summary (README_RackSentinel_FINAL.md section 11 in the source package lists the commands)
+\begin{table}[H]
+\caption[Verification summary]{Verification summary. Every row can fail; section~11 of the package README gives the command that reproduces it.}
+\label{tab:verif}
+{\tablestyle
+\begin{tabularx}{\linewidth}{@{}P{38mm}LP{40mm}P{18mm}@{}}
+\toprule
+\colhead{Test} & \colhead{Scope} & \colhead{Result} & \colhead{Evidence}\\
+\midrule
+Official firmware\newline\code{tb\_official\_test.v} & \code{DATADIR}, GPIO copy, UART echo, ordering, four further patterns & \pass: 20 checks, 0 failures (platform and Icarus) & \secref{sec:official}, \figref{fig:official}\\
+Application testbench\newline\code{tb\_data\_center\_}\newline\code{application.v} & 12 cases: boundaries, single faults, latch and reset rules, held button, invalid data, bad CRC & \pass: 124 checks, 0 failures; each case also alone on the platform & Figures~\ref{fig:matrix}, \ref{fig:applog}\\
+Emulator runs\newline\code{emu\_runs.txt}, \code{emu.sh} & Each case from reset, $\le$\,8 reply bytes, $\le$\,2.61\,ms simulated; the 12 lines replayed with the \code{emu.c} option semantics & \pass: 12 of 12 within limits; replay 12 of 12 & \tabref{tab:emuruns}\\
+Mutation test\newline\code{mutate\_final.sh} & 4 bugs in the latch logic: auto-clear restored, reset while Warm, reset at warning current, level-triggered reset & \pass: 4 of 4 detected (5, 4, 2, 1 failing checks) & this table\\
+CRC strength\newline\code{crc\_verify.py} & Check value \hex{0x29B1}; all 1-, 2- and 3-bit errors in a SAMPLE packet & \pass: 0 of 18,472 missed (XOR checksum: 80 of 10,700) & \secref{sec:crc}\\
+Firmware rebuild\newline organizer \code{Makefile} & \code{main.s} → \code{firmware.bin} → \code{IMEM\_Data\_Center} & \pass: byte-identical, 275 of 275 words & \secref{sec:firmware}\\
+\bottomrule
+\end{tabularx}}
+\end{table}

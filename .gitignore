@@ -1,13 +1,18 @@
+# dependencies and build output
 node_modules/
 .next/
 out/
 coverage/
 *.tsbuildinfo
-next-env.d.ts
-.vercel
-.env*.local
 
-# local logs and tool caches
-*.log
+# local tooling and OS files
+.env*.local
+.vercel
 .impeccable/
 .playwright-mcp/
+.obsidian/
+.DS_Store
+Thumbs.db
+
+# large media kept out of git (publish as a GitHub Release asset)
+docs/demo/

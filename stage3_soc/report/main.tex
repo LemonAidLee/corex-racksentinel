@@ -1,0 +1,34 @@
+% =====================================================================
+%  RackSentinel -- Phase 3 Design Submission Report (v2 edition)
+%  ChampionCHIP eXperience Malaysia -- Team CoreX
+%
+%  Design:   stage3_design-2026.09.29_ver2 (ChipInventor export)
+%  Firmware: teammate_version/dc_teammate.s (275 instructions)
+%
+%  Build (LuaLaTeX):
+%     python figures/src/wave.py            (Figures 5b, 8b from sim/*.vcd)
+%     cd figures/src && lualatex fig01_concept && ...   (TikZ figures)
+%     lualatex -jobname=Stage_3_Report_v2 main
+%     bibtex   Stage_3_Report_v2
+%     lualatex -jobname=Stage_3_Report_v2 main   (x2)
+%  Simulations that produce the evidence: see sim/README.md
+% =====================================================================
+\documentclass[10pt,a4paper]{article}
+\usepackage{rackstyle}
+\hypersetup{
+  pdftitle={RackSentinel: Phase 3 Design Submission Report},
+  pdfauthor={Team CoreX: Law Hui Tan, Chia Jing Xiang, Ooi Chin Ming, Lee Wen Yi, Leow Jia Jun},
+  pdfsubject={ChampionCHIP eXperience Malaysia, Phase 3},
+  pdfkeywords={RISC-V, RVBL-2, GPIO, UART, CRC-16, Zmmul, data centre, EPO}}
+
+\begin{document}
+\input{sections/00_cover}
+\input{sections/00b_contents}
+\input{sections/01_overview}
+\input{sections/02_integration}
+\input{sections/03_official_testbench}
+\input{sections/04_application}
+\input{sections/05_firmware}
+\input{sections/06_validation}
+\input{sections/07_conclusion}
+\end{document}

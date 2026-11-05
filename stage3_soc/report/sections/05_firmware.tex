@@ -1,0 +1,70 @@
+% =====================================================================
+\kicker{Guide topic 5}
+\section{Firmware Development and Processing}\label{sec:firmware}
+% =====================================================================
+\resultstrip{Implement the application in RV32I assembly using the custom CRC and Zmmul instructions.}
+  {275 instructions; rebuild matches the ROM byte for byte}
+  {\figref{fig:flow}; listings in \secref{sec:crc} and \secref{sec:epo}}
+
+The firmware is a single RV32I assembly file, \code{main.s}: 275 instructions, 1,100\,B. The organizer's RVBL-Firmware-Builder~\cite{repos} (GNU toolchain, \mbox{\code{-march=rv32i\_zmmul}}) rebuilds it into exactly the submitted \code{firmware.bin}, whose 275 words match \code{IMEM\_Data\_Center} in the exported design; \code{crcb} is emitted through a \code{.insn} macro because the assembler does not know the custom opcode. Application state occupies 22 words of DMEM at \hex{0x1001\_0000} and is cleared at boot. \figref{fig:flow} traces one packet from arrival to reply.
+
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=0.78\linewidth]{fig06_firmware_flow.pdf}
+\caption[Firmware decision flow]{Firmware control flow in four lanes. A complete packet produces one reply; a timed-out fragment produces none.}
+\label{fig:flow}
+\end{figure}
+
+\subsection{UART handling}\label{sec:uart}
+\code{rx\_byte\_wait} polls \code{CONTROL.RXDONE} for the first byte without a time limit and calls \code{check\_reset} between polls, so the reset button is served while the line is idle. \code{rx\_byte\_timeout} then reads the remaining 5 bytes of a SAMPLE or 3 bytes of a command. Each byte has a limit of 12,500,992 polls of 20 cycles (measured): 10\,s at 25\,MHz or 1.0\,s at 250\,MHz, well above the 100\,ms emulator gap. On a timeout the fragment is dropped without a reply, so a lost byte cannot misalign later packets. Each received byte is acknowledged by writing 0 to \code{RXDONE} before \code{RXDATA} is read; \code{tx\_byte} waits for \code{TXDONE}, writes \code{TXDATA} and sets \code{TRANSMIT} by read-modify-write, as the organizer's firmware does.
+
+\subsection{CRC with the Xicrc instruction}\label{sec:crc}
+\noindent\begin{minipage}[t]{0.5\linewidth}\RaggedRight
+\vspace{0pt}
+The firmware assembles the received CRC from CRC\_LO and CRC\_HI (\code{slli}, \code{or}) and recomputes it from \hex{0xFFFF} with one \code{crcb} per byte: four for a SAMPLE, two for a command. A mismatch returns \hex{0x5A}, increments a saturating reject counter (read with COUNTERS) and executes nothing. The algorithm reproduces the CRC-16-CCITT check value \hex{0x29B1} for \code{"123456789"}.
+\end{minipage}\hfill
+\begin{minipage}[t]{0.47\linewidth}
+\vspace{0pt}
+\begin{lstlisting}
+li   t0, 0xFFFF
+crcb t0, s2, t0          # s2 = 0x5A
+crcb t0, s3, t0          # s3 = V
+crcb t0, s4, t0          # s4 = I
+crcb t0, s5, t0          # s5 = T
+bne  t0, t5, cmd_badcrc  # received CRC
+\end{lstlisting}
+\begin{keyresult}[Verified: CRC against a checksum]
+All 1-, 2- and 3-bit errors in a SAMPLE packet (18,472 patterns): the CRC misses \textbf{none}; an 8-bit XOR checksum misses \textbf{80} of 10,700.
+\end{keyresult}
+\end{minipage}
+
+\subsection{Temperature with Zmmul}\label{sec:zmmul}
+The single multiplication converts a temperature reading from 0.5\,°C to 0.1\,°C steps, $T_{0.1\,°\mathrm{C}} = 5 \times \mathit{raw}_T$ (\code{mul}). Signed comparisons with the Warm and Critical thresholds (defaults 270 and 320) give class 0 (Normal), 1 (Warm) or 3 (Critical). Current is compared in raw 0.2\,A steps with 128 (25.6\,A) and 160 (32.0\,A), so the firmware contains no division.
+
+\subsection{GPIO control, latching EPO and thresholds}\label{sec:epo}
+\noindent\begin{minipage}[t]{0.5\linewidth}\RaggedRight
+\vspace{0pt}
+\code{update\_outputs} writes the pin word to \code{DATAOUT} with one \code{sw}: P4 for Warm, P5 for Critical, P6 for a current warning and P7 while the EPO is latched. A SAMPLE that is Critical or above the trip current sets the EPO and increments a saturating trip counter; later safe readings leave it set. Only \code{check\_reset} (right) clears it: on a new press of P0, with the inlet Normal and the current below the warning level. A button held through a trip therefore never clears it.\par\smallskip
+Temperature thresholds change through STAGE\_HIGH followed by SET\_WARM or SET\_CRIT and are committed only if Warm < Critical; current levels must keep warning < trip.
+\end{minipage}\hfill
+\begin{minipage}[t]{0.47\linewidth}
+\vspace{0pt}
+\begin{lstlisting}
+check_reset:                 # excerpt
+  lw   a4, GPIO_DATAIN(s0)
+  andi a4, a4, PIN_RESET     # P0 level
+  lw   t1, ST_BTN_PREV(s11)
+  sw   a4, ST_BTN_PREV(s11)
+  beqz a4, _cr_ret           # not pressed
+  bnez t1, _cr_ret           # held: no new press
+  lw   t0, ST_EPO(s11)
+  beqz t0, _cr_ret           # EPO not set
+  lw   t0, ST_CLASS(s11)
+  bnez t0, _cr_ret           # inlet not Normal
+  lw   t0, ST_LATEST_CURRENT(s11)
+  lw   t1, ST_WARN_CURRENT(s11)
+  bgeu t0, t1, _cr_ret       # I >= warning level
+  sw   zero, ST_EPO(s11)     # release the EPO
+  jal  ra, update_outputs
+\end{lstlisting}
+\end{minipage}

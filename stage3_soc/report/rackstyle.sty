@@ -1,0 +1,262 @@
+% =====================================================================
+%  rackstyle.sty -- the RackSentinel report design system.
+%  Semantic commands only; sections never format by hand.
+% =====================================================================
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{rackstyle}[2026/09/28 RackSentinel report style]
+
+% ---------------------------------------------------------------------
+%  Page
+% ---------------------------------------------------------------------
+\RequirePackage[a4paper, left=14mm, right=14mm, top=16mm, bottom=14mm,
+  headheight=12pt, headsep=3.5mm, footskip=6.5mm]{geometry}
+
+% ---------------------------------------------------------------------
+%  Type and colour
+% ---------------------------------------------------------------------
+\RequirePackage[table]{xcolor}
+\input{fonts.tex}
+\input{palette.tex}
+\RequirePackage[protrusion=true, expansion=true]{microtype}
+\frenchspacing
+\linespread{1.03}
+\setlength{\parindent}{1.1em}
+\setlength{\parskip}{0pt plus 0.6pt}
+\setlength{\emergencystretch}{1.2em}
+\clubpenalty=10000 \widowpenalty=10000 \displaywidowpenalty=10000
+\color{ink}
+\newcommand{\code}[1]{\texttt{#1}}          % identifiers in running text
+\newcommand{\hex}[1]{\texttt{#1}}           % hexadecimal values
+\newcommand{\emu}[1]{\texttt{#1}}           % ./emu options
+\newcommand{\unit}[2]{#1\,#2}               % value + unit, never broken
+\newcommand{\sq}{\textquotesingle}
+
+% ---------------------------------------------------------------------
+%  Structure: every section carries a kicker naming its Guide topic
+% ---------------------------------------------------------------------
+\RequirePackage{titlesec}
+\newcommand{\RS@kicker}{}
+\newcommand{\kicker}[1]{\renewcommand{\RS@kicker}{#1}}
+\newcommand{\RSsectionhead}[1]{%
+  \begin{minipage}{\linewidth}
+  {\color{navy}\sansthin\fontsize{23}{23}\selectfont\thesection}\hspace{3mm}%
+  {\color{navy}\sffamily\bfseries\fontsize{15}{18}\selectfont #1}\hfill
+  {\color{river}\sffamily\bfseries\fontsize{6.9}{8}\selectfont
+   \addfontfeatures{LetterSpace=16}\MakeUppercase{\RS@kicker}}\par
+  \vspace{2pt}{\color{hair}\rule{\linewidth}{0.5pt}}
+  \end{minipage}}
+\titleformat{\section}[block]{}{}{0pt}{\RSsectionhead}
+\titlespacing*{\section}{0pt}{8pt plus 3pt minus 2pt}{4pt}
+\titleformat{\subsection}[hang]
+  {\sffamily\bfseries\fontsize{10.3}{12.5}\selectfont\color{navy}}
+  {\color{river}\thesubsection}{0.6em}{}
+\titlespacing*{\subsection}{0pt}{5.5pt plus 2pt minus 1pt}{2pt}
+% run-in heads inside a subsection
+\newcommand{\runin}[1]{{\sffamily\bfseries\color{navy}#1}\hspace{0.45em}}
+
+% Opening deck of a section: one or two sentences, set larger
+\newcommand{\lede}[1]{\noindent{\sanslight\color{navy}#1}\enspace\ignorespaces}
+
+% ---------------------------------------------------------------------
+%  Callouts (square, quiet, colour-coded by meaning)
+% ---------------------------------------------------------------------
+\RequirePackage[most]{tcolorbox}
+\newcommand{\RS@label}[2]{{\color{#1}\sffamily\bfseries\fontsize{6.6}{8}\selectfont
+  \addfontfeatures{LetterSpace=14}\MakeUppercase{#2}}\par\vspace{1.6pt}}
+% callout[opts]{colour}{label}
+\newtcolorbox{callout}[3][]{enhanced, breakable=false,
+  colback=mist, colframe=#2, boxrule=0pt, leftrule=2pt, arc=0pt, outer arc=0pt,
+  left=5pt, right=5pt, top=3.5pt, bottom=3.5pt, boxsep=0pt,
+  fontupper=\sffamily\small, before upper={\RS@label{#2}{#3}},
+  before skip=4pt, after skip=5pt, #1}
+% key result: teal, used only for verified outcomes
+\newenvironment{keyresult}[1][Verified]{\begin{callout}{teal}{#1}}{\end{callout}}
+\newenvironment{designnote}[1][Design decision]{\begin{callout}{river}{#1}}{\end{callout}}
+% head of an input / processing / output cell
+\newcommand{\ipo}[2]{\RS@label{#1}{#2}}
+% cover furniture
+\newcommand{\coverlabel}[1]{\RS@label{river}{#1}}
+% \coverstat[colour]{number}{what}{detail}: teal = verified outcome, navy = quantity
+\newcommand{\coverstat}[4][teal]{%
+  {\color{hair}\rule{\linewidth}{0.5pt}}\par\vspace{1.2mm}
+  {\sanslight\fontsize{15}{17}\selectfont\color{#1}#2}\par\vspace{0.2mm}
+  {\sffamily\bfseries\footnotesize\color{navy}#3}\par\vspace{0.2mm}
+  {\sffamily\scriptsize\color{slate}\RaggedRight #4\par}}
+% pull quote: a key statement between two rules
+\newcommand{\pullquote}[1]{%
+  \par\vspace{3pt}\noindent{\color{river}\rule{\linewidth}{0.8pt}}\par\vspace{3.5pt}
+  {\noindent\sanslight\itshape\fontsize{11.5}{15}\selectfont\color{navy}#1\par}
+  \vspace{3.5pt}\noindent{\color{hair}\rule{\linewidth}{0.4pt}}\par\vspace{4pt}}
+
+% ---------------------------------------------------------------------
+%  Figures and captions
+% ---------------------------------------------------------------------
+\RequirePackage{graphicx}
+\graphicspath{{figures/}}
+\RequirePackage{float}
+\RequirePackage[font={small,sf}, labelfont={bf,color=river}, labelsep=quad,
+  justification=justified, singlelinecheck=true, skip=4pt]{caption}
+\RequirePackage[font={small,sf}, labelfont={bf,color=navy}, skip=2pt, justification=raggedright, singlelinecheck=false]{subcaption}
+\captionsetup[table]{position=top, skip=3pt}
+\DeclareCaptionFont{inkcol}{\color{ink}}
+\captionsetup{textfont=inkcol}
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\floatsep}{7pt plus 2pt minus 2pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+\renewcommand{\topfraction}{0.92}
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.06}
+\renewcommand{\floatpagefraction}{0.9}
+% Evidence screenshots: never altered, framed with a hairline
+\newcommand{\sidecaption}{\captionsetup{justification=raggedright,singlelinecheck=false}}
+\newcommand{\evidence}[2]{{\setlength{\fboxsep}{0pt}\color{hair}%
+  \fbox{\includegraphics[width=\dimexpr#1-2\fboxrule\relax]{#2}}}}
+
+% ---------------------------------------------------------------------
+%  Tables
+% ---------------------------------------------------------------------
+\RequirePackage{array, booktabs, tabularx, ragged2e}
+\newcolumntype{L}{>{\RaggedRight\arraybackslash}X}
+\newcolumntype{P}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+\setlength{\aboverulesep}{0pt}
+\setlength{\belowrulesep}{0pt}
+\setlength{\heavyrulewidth}{0.9pt}
+\setlength{\lightrulewidth}{0.45pt}
+\setlength{\tabcolsep}{4pt}
+\newcommand{\tablestyle}{\sanscond\small\renewcommand{\arraystretch}{1.16}%
+  \arrayrulecolor{navy}\rowcolors{2}{white}{mist!70}}
+\newcommand{\colhead}[1]{\rule[-1.2ex]{0pt}{3.6ex}{\sffamily\bfseries\color{navy}#1}}
+\newcommand{\headrow}{\rowcolor{white}}
+\newcommand{\pass}{\leavevmode{\sffamily\bfseries\color{teal}PASS}}
+% float-only pages: stack floats from the top instead of centring them
+\setlength{\@fptop}{0pt}
+\setlength{\@fpsep}{12pt plus 2pt}
+\setlength{\@fpbot}{0pt plus 1fil}
+
+% ---------------------------------------------------------------------
+%  Code listings
+% ---------------------------------------------------------------------
+\RequirePackage{listings}
+\lstdefinelanguage{rvasm}{
+  morekeywords={li,lw,sw,andi,beqz,bnez,addi,ori,ret,crcb,bne,mul,blt,bge,bltu,bgeu,beq,mv,j,jal,xori,sltu},
+  morecomment=[l]{\#}, sensitive=true}
+\lstset{language=rvasm,
+  basicstyle=\ttfamily\footnotesize\color{ink},
+  keywordstyle=\color{navy}\bfseries, commentstyle=\color{slate}\itshape,
+  columns=fixed, basewidth=0.6em, keepspaces=true, showstringspaces=false,
+  backgroundcolor=\color{mist}, frame=l, framerule=2pt, rulecolor=\color{river},
+  xleftmargin=6pt, framexleftmargin=6pt, framesep=5pt,
+  aboveskip=4pt, belowskip=5pt, breaklines=false}
+\RequirePackage{needspace}
+\RequirePackage{etoolbox}
+\preto\section{\needspace{4\baselineskip}}
+\RequirePackage{enumitem}
+\RequirePackage{multicol}
+
+% ---------------------------------------------------------------------
+%  Lists: the main reading unit of this edition
+% ---------------------------------------------------------------------
+% square river bullet; en dash for the second level; bold river numbers
+\newcommand{\RS@bullet}{{\color{river}\rule[0.28ex]{0.36em}{0.36em}}}
+\setlist{nosep, topsep=1.5pt, partopsep=0pt, itemsep=0.9pt, parsep=0pt}
+\setlist[itemize,1]{leftmargin=1.05em, labelsep=0.5em, label=\RS@bullet}
+\setlist[itemize,2]{leftmargin=1.0em, labelsep=0.4em, label={\color{slate}–}}
+\setlist[enumerate,1]{leftmargin=1.25em, labelsep=0.45em,
+  label={\sffamily\bfseries\color{river}\arabic*}}
+% bold sans lead-in of a bullet: \lead{Goal}
+\newcommand{\lead}[1]{{\sffamily\bfseries\color{navy}#1}\enspace}
+% compact list inside callouts
+\newlist{tightlist}{itemize}{1}
+\setlist[tightlist]{leftmargin=0.95em, labelsep=0.45em, label=\RS@bullet,
+  topsep=1pt, itemsep=0.6pt}
+% Result strip under a section heading: \resultstrip{objective}{result}{evidence}
+\newcommand{\RS@striplabel}[1]{{\sffamily\bfseries\fontsize{6.4}{8}\selectfont
+  \addfontfeatures{LetterSpace=14}\color{river}\MakeUppercase{#1}}}
+\newcommand{\resultstrip}[3]{%
+  \par\noindent\begin{tcolorbox}[enhanced, colback=mist, colframe=mist, boxrule=0pt, arc=0pt,
+    left=5pt, right=5pt, top=3pt, bottom=3pt, boxsep=0pt, before skip=1pt, after skip=5pt,
+    fontupper=\sffamily\small\color{ink}]
+  \RS@striplabel{Objective}\enspace #1\par\vspace{1pt}
+  \RS@striplabel{Result}\enspace{\bfseries\color{teal}#2}\hfill\RS@striplabel{Evidence}\enspace #3
+  \end{tcolorbox}}
+% numbered marker on annotated screenshots and in their keys: \mk{3}
+\newcommand{\mk}[1]{\tikz[baseline=-0.62ex]\node[circle, fill=alarm, text=white, inner sep=0pt,
+  minimum size=1.15em, font=\sffamily\bfseries\scriptsize]{#1};}
+% simulation log, verbatim, in a quiet frame
+\lstdefinestyle{simlog}{language={}, basicstyle=\ttfamily\fontsize{6.8}{8.1}\selectfont\color{ink},
+  backgroundcolor=\color{white}, frame=single, framerule=0.4pt, rulecolor=\color{hair},
+  xleftmargin=3pt, xrightmargin=3pt, framexleftmargin=3pt, framexrightmargin=3pt, framesep=3pt,
+  breaklines=true, breakatwhitespace=true, postbreak={\mbox{\textcolor{slate}{$\hookrightarrow$}\,}},
+  aboveskip=0pt, belowskip=0pt, keywordstyle={}, commentstyle={}, columns=fullflexible}
+
+% ---------------------------------------------------------------------
+%  Mathematics
+% ---------------------------------------------------------------------
+\RequirePackage{amsmath}
+\setlength{\abovedisplayskip}{4pt plus 1pt}
+\setlength{\belowdisplayskip}{4pt plus 1pt}
+\setlength{\abovedisplayshortskip}{2pt}
+\setlength{\belowdisplayshortskip}{3pt}
+
+% ---------------------------------------------------------------------
+%  Running heads
+% ---------------------------------------------------------------------
+\RequirePackage{fancyhdr, lastpage}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\sectionmark}[1]{\markboth{\thesection\enspace #1}{}}
+\fancyhead[L]{\sffamily\scriptsize\color{slate}{\bfseries\color{navy}RackSentinel}\enspace\textcolor{hair}{|}\enspace A data-centre rack guardian on the RVBL-2 RISC-V SoC}
+\fancyhead[R]{\sffamily\scriptsize\color{slate}Team CoreX\enspace\textcolor{hair}{|}\enspace Phase 3 Design Submission Report}
+\fancyfoot[R]{\sffamily\scriptsize\color{slate}{\bfseries\color{navy}\thepage}\,/\,\pageref*{LastPage}}
+\fancyfoot[L]{\sffamily\scriptsize\color{slate}ChampionCHIP eXperience Malaysia}
+\renewcommand{\headrule}{{\color{hair}\hrule height 0.4pt}}
+\renewcommand{\footrulewidth}{0pt}
+\fancypagestyle{first}{\fancyhf{}%
+  \fancyfoot[L]{\sffamily\scriptsize\color{slate}ChampionCHIP eXperience Malaysia}%
+  \fancyfoot[R]{\sffamily\scriptsize\color{slate}{\bfseries\color{navy}\thepage}\,/\,\pageref*{LastPage}}%
+  \renewcommand{\headrule}{}}
+
+% ---------------------------------------------------------------------
+%  Links and references
+% ---------------------------------------------------------------------
+\RequirePackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=river, urlcolor=river, citecolor=river}
+\RequirePackage{url}
+\RequirePackage{xurl}          % long URLs may break at any character
+\urlstyle{tt}
+\newcommand{\secref}[1]{\S\ref{#1}}
+\newcommand{\figref}[1]{Figure~\ref{#1}}
+\newcommand{\tabref}[1]{Table~\ref{#1}}
+
+% ---------------------------------------------------------------------
+%  Contents page (titletoc): styled entries, lists without headings
+% ---------------------------------------------------------------------
+\RequirePackage{titletoc}
+\newcommand{\RS@leaders}{\hspace{0.8em}\textcolor{hair}{\titlerule*[0.55em]{.}}}
+\titlecontents{section}[11mm]
+  {\addvspace{5.5pt}\sffamily\bfseries\fontsize{11}{14}\selectfont\color{navy}}
+  {\contentslabel[{\sansthin\fontsize{17}{14}\selectfont\color{river}\thecontentslabel}]{11mm}}
+  {}{\RS@leaders{\color{navy}\contentspage}}
+\titlecontents{subsection}[20mm]
+  {\addvspace{1.2pt}\sffamily\small\color{ink}}
+  {\contentslabel[{\color{river}\thecontentslabel}]{9mm}}
+  {}{\RS@leaders{\color{slate}\contentspage}}
+\titlecontents{figure}[9mm]
+  {\addvspace{1pt}\sffamily\footnotesize\color{ink}}
+  {\contentslabel[{\bfseries\color{river}\thecontentslabel}]{9mm}}
+  {}{\RS@leaders{\color{slate}\contentspage}}
+\titlecontents{table}[9mm]
+  {\addvspace{1pt}\sffamily\footnotesize\color{ink}}
+  {\contentslabel[{\bfseries\color{river}\thecontentslabel}]{9mm}}
+  {}{\RS@leaders{\color{slate}\contentspage}}
+\contentsmargin{1.8em}
+\newcommand{\RStoc}{\@starttoc{toc}}
+\newcommand{\RSlof}{\@starttoc{lof}}
+\newcommand{\RSlot}{\@starttoc{lot}}
+% guide-topic tag shown after a section's contents entry
+\newcommand{\toctag}[1]{\addtocontents{toc}{\protect\vspace{-1pt}\protect\hfill{\protect\sffamily\protect\bfseries\protect\fontsize{6.4}{8}\protect\selectfont\protect\color{river}#1}\protect\par}}
+
+\RequirePackage{tikz}
+\usetikzlibrary{arrows.meta,calc,positioning,fit,backgrounds}
+\RSTikzStyles
+\endinput

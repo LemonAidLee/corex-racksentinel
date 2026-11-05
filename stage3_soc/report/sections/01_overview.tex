@@ -1,0 +1,32 @@
+% =====================================================================
+\kicker{Guide topic 1}
+\section{Project Overview}\label{sec:overview}
+% =====================================================================
+\resultstrip{Protect one data-centre rack against overheating and feed overload with an on-chip controller.}
+  {RVBL-2 SoC with GPIO and UART; 275-instruction firmware}
+  {\figref{fig:concept}; summary on page~2}
+
+A cooling failure or an overloaded power feed can take a server rack offline. RackSentinel places the protection decision on the RVBL-2 SoC that guards one server rack in a Johor data hall. The data-centre management system (DCIM) forwards the rack's inlet temperature, feed voltage and feed current to the chip over the UART, together with configuration and status commands. The firmware rejects corrupted packets with the custom CRC-16 instruction \code{crcb}, scales the temperature with the Zmmul \code{mul} instruction and classifies both readings. It then drives four GPIO outputs: fan boost, fans at maximum, a current warning and an \textbf{emergency power-off (EPO)} that stays latched until an operator resets it on P0 under safe conditions (\figref{fig:concept}).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{fig01_concept.pdf}
+\caption[System concept: inputs, on-chip decision, outputs]{System concept. Readings and commands arrive on the UART (blue) and the reset button on P0 (navy); the chip verifies, converts, classifies and drives four outputs. Monospaced labels give the \texttt{./emu} option for each connection.}
+\label{fig:concept}
+\end{figure}
+
+The Stage~2 core is reused unchanged; Stage~3 adds the GPIO and UART peripherals and modifies only the address decoder (\secref{sec:gpio}). In the demonstration the organizer's emulator, \code{./emu}, replaces the DCIM and the reset button, as a hardware-in-the-loop bench would. All results come from simulation of the design exported by ChipInventor, on the ChipInventor platform and in Icarus Verilog; direct AWS FPGA implementation is outside this phase~\cite{guide}. The work followed the Phase~3 workflow in order:
+
+\smallskip
+\noindent\begin{tikzpicture}[x=1mm,y=1mm]
+  \foreach \i/\t/\s in {0/{GPIO \& UART\\integration}/\secref{sec:gpio},
+                        1/{Official firmware\\testbench}/\secref{sec:official},
+                        2/{Application\\definition}/\secref{sec:app},
+                        3/{Application\\firmware}/\secref{sec:firmware},
+                        4/{Application\\testbench}/\secref{sec:validation},
+                        5/{Emulator\\preview}/\secref{sec:emu}}{
+    \node[draw=navy, line width=0.6pt, fill=\ifnum\i<2 riversoft\else white\fi, minimum width=25.5mm, minimum height=8.4mm,
+          align=center, font=\sffamily\scriptsize, anchor=west] (w\i) at ({\i*30.8},5) {\t};
+    \node[font=\sffamily\scriptsize\bfseries, text=river, anchor=north, inner sep=1.2pt] at (w\i.south) {\s};
+    \ifnum\i>0 \draw[->, navy, line width=0.6pt] ({\i*30.8-5.3},5) -- ({\i*30.8},5); \fi}
+\end{tikzpicture}

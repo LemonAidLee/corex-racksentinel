@@ -1,0 +1,124 @@
+% Figure 7 -- Validation matrix of the 12 verified ./emu runs (C01-C12).
+% Every cell is decoded from the command lines printed by tb_dc_teammate.v
+% (sim/tb_dc_teammate.log, identical to teammate_version/emu_runs.txt):
+%   SAMPLE -t4 0x{T}{I}{V}5A -t2 0x{CRC}: I raw x 0.2 A, T raw x 0.5 degC;
+%   -o expected P7-P4 byte; -r expected reply.  Nothing is added.
+\documentclass[border=0pt]{standalone}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc}
+\input{../../fonts.tex}
+\input{../../palette.tex}
+\RSTikzStyles
+\tikzset{cN/.style={fill=tealsoft, draw=teal}, cW/.style={fill=ambersoft, draw=amber},
+  cC/.style={fill=alarmsoft, draw=alarm}, cR/.style={fill=white, draw=river}}
+\def\lw{38.6}    % label column width (mm)
+\def\cw{23.2}    % step cell width
+\def\rh{6.6}    % row height
+% \cell{row}{col}{stimulus}{value}{style: N W C R}
+\newcommand{\cell}[5]{%
+  \pgfmathsetmacro{\x}{\lw+(#2-1)*\cw}%
+  \pgfmathsetmacro{\y}{-(#1-1)*\rh}%
+  \node[anchor=north west, font=\sffamily\scriptsize, text=ink, inner sep=0pt]
+       at (\x+1.1,\y-0.6) {#3};
+  \node[anchor=north west, c#5, line width=0.55pt, minimum width=\cw mm-3.0mm, minimum height=3.1mm,
+        inner sep=0.5pt, font=\ttfamily\scriptsize, text=ink] at (\x+1.1,\y-3.3) {#4};
+  \ifnum#2>1 \draw[-{Stealth[length=2pt]}, hair, line width=0.5pt] (\x-0.9,\y-4.85) -- (\x+1.0,\y-4.85);\fi
+}
+\newcommand{\runlabel}[3]{% row, id, scenario
+  \pgfmathsetmacro{\y}{-(#1-1)*\rh}%
+  \node[anchor=north west, font=\sffamily\bfseries\scriptsize, text=navy, inner sep=0pt] at (0,\y-0.9) {#2};
+  \node[anchor=north west, font=\sffamily\scriptsize, text=ink, inner sep=0pt, text width=\lw mm-8.5mm,
+        align=left] at (7.4,\y-0.95) {#3};
+}
+\newcommand{\s}[2]{#1\,A · #2\,°C}   % one SAMPLE at 230 V
+\begin{document}
+\begin{tikzpicture}[x=1mm,y=1mm]
+  \node[kicker, anchor=west] at (0,3.8) {CASE AND SCENARIO};
+  \node[kicker, anchor=west] at (\lw+1.1,3.8) {STIMULUS FROM ./emu\enspace→\enspace REPLY (-r) · EXPECTED PINS P7–P4 (-o), IN ORDER};
+  \draw[navy, line width=0.8pt] (0,1.8) -- (178,1.8);
+  \foreach \r in {2,4,...,12} \fill[mist] (0,{-(\r-1)*\rh}) rectangle (178,{-\r*\rh});
+  \draw[navy, line width=0.8pt] (0,{-12*\rh}) -- (178,{-12*\rh});
+
+  \runlabel{1}{C01}{Normal temperature and current}
+  \cell{1}{1}{\s{25.4}{26.5}}{A5 · 00}{N}
+  \cell{1}{2}{STATUS}{007F3540}{R}
+
+  \runlabel{2}{C02}{Warm boundaries: 27.0 and 32.0\,°C}
+  \cell{2}{1}{\s{25.4}{27.0}}{A5 · 10}{W}
+  \cell{2}{2}{\s{25.4}{32.0}}{A5 · 10}{W}
+  \cell{2}{3}{STATUS}{007F4041}{R}
+
+  \runlabel{3}{C03}{Temperature Critical}
+  \cell{3}{1}{\s{25.4}{32.5}}{A5 · A0}{C}
+  \cell{3}{2}{STATUS}{017F414B}{R}
+
+  \runlabel{4}{C04}{Current boundaries: 25.6 and 32.0\,A}
+  \cell{4}{1}{\s{25.4}{25.0}}{A5 · 00}{N}
+  \cell{4}{2}{\s{25.6}{25.0}}{A5 · 40}{W}
+  \cell{4}{3}{\s{32.0}{25.0}}{A5 · 40}{W}
+
+  \runlabel{5}{C05}{Current Critical (trip)}
+  \cell{5}{1}{\s{32.2}{25.0}}{A5 · C0}{C}
+  \cell{5}{2}{STATUS}{01A1324C}{R}
+
+  \runlabel{6}{C06}{Either fault is enough}
+  \cell{6}{1}{\s{32.2}{32.5}}{A5 · E0}{C}
+  \cell{6}{2}{\s{32.2}{25.0}}{A5 · C0}{C}
+  \cell{6}{3}{\s{25.4}{32.5}}{A5 · A0}{C}
+
+  \runlabel{7}{C07}{Both must become Normal}
+  \cell{7}{1}{\s{32.2}{32.5}}{A5 · E0}{C}
+  \cell{7}{2}{\s{25.6}{27.0}}{A5 · D0}{C}
+  \cell{7}{3}{\s{25.4}{26.5}}{A5 · 80}{C}
+  \cell{7}{4}{P0 pressed}{00 cleared}{N}
+
+  \runlabel{8}{C08}{Warm temperature blocks recovery}
+  \cell{8}{1}{\s{25.4}{32.5}}{A5 · A0}{C}
+  \cell{8}{2}{\s{25.4}{32.0}}{A5 · 90}{C}
+  \cell{8}{3}{\s{25.4}{26.5}}{A5 · 80}{C}
+  \cell{8}{4}{P0 pressed}{00 cleared}{N}
+
+  \runlabel{9}{C09}{Warning current blocks recovery}
+  \cell{9}{1}{\s{32.2}{25.0}}{A5 · C0}{C}
+  \cell{9}{2}{\s{25.6}{25.0}}{A5 · C0}{C}
+  \cell{9}{3}{P0 pressed}{C0 refused}{C}
+  \cell{9}{4}{\s{25.4}{25.0}}{A5 · 80}{C}
+  \cell{9}{5}{P0 pressed}{00 cleared}{N}
+
+  \runlabel{10}{C10}{Invalid packets change nothing}
+  \cell{10}{1}{\s{25.4}{32.5}}{A5 · A0}{C}
+  \cell{10}{2}{temperature raw 0}{3C · A0}{C}
+  \cell{10}{3}{corrupted CRC}{5A · A0}{C}
+
+  \runlabel{11}{C11}{P0 refused until temperature and current are safe}
+  \cell{11}{1}{\s{25.4}{32.5}}{A5 · A0}{C}
+  \cell{11}{2}{P0 pressed}{A0 refused}{C}
+  \cell{11}{3}{\s{25.4}{27.0}}{A5 · 90}{C}
+  \cell{11}{4}{P0 pressed}{90 refused}{C}
+  \cell{11}{5}{\s{25.4}{26.5}}{A5 · 80}{C}
+  \cell{11}{6}{P0 pressed}{00 cleared}{N}
+
+  \runlabel{12}{C12}{A held P0 never clears the EPO}
+  \cell{12}{1}{P0 held down}{—}{R}
+  \cell{12}{2}{\s{32.2}{25.0}}{A5 · C0}{C}
+  \cell{12}{3}{\s{25.4}{25.0}}{A5 · 80}{C}
+  \cell{12}{4}{release, press again}{00 cleared}{N}
+
+  % legend
+  \begin{scope}[shift={(0,{-12*\rh-4.6})}, every node/.style={font=\sffamily\scriptsize, text=ink, anchor=west, inner sep=0pt}]
+    \fill[tealsoft] (0,0) rectangle (3.6,2.5); \draw[teal, line width=0.55pt] (0,0) rectangle (3.6,2.5);
+    \node at (4.6,1.25) {\texttt{00} all off / EPO cleared};
+    \fill[ambersoft] (36,0) rectangle (39.6,2.5); \draw[amber, line width=0.55pt] (36,0) rectangle (39.6,2.5);
+    \node at (40.6,1.25) {\texttt{10} P4 fan boost,\; \texttt{40} P6 current warning};
+    \fill[alarmsoft] (93,0) rectangle (96.6,2.5); \draw[alarm, line width=0.55pt] (93,0) rectangle (96.6,2.5);
+    \node at (97.6,1.25) {\texttt{80} P7 EPO (+\,\texttt{20} fans max, \texttt{10}, \texttt{40})};
+    \draw[river, line width=0.55pt] (146,0) rectangle (149.6,2.5);
+    \node at (150.6,1.25) {reply bytes (\texttt{-r})};
+  \end{scope}
+  \node[font=\sffamily\scriptsize\itshape, text=slate, anchor=west, inner sep=0pt] at (0,{-12*\rh-8.6})
+       {Samples at 230\,V unless stated. A5 accepted, 3C invalid, 5A bad CRC; each P0 press is followed by a release (\texttt{-i 0x00}).};
+  \pgfresetboundingbox
+  \useasboundingbox (0,5.2) rectangle (178,{-12*\rh-10.2});
+\end{tikzpicture}
+\end{document}

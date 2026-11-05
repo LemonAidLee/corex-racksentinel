@@ -1,0 +1,115 @@
+VCD info: dumpfile testbench.vcd opened for output.
+START C01 Normal temperature and current
+SAMPLE START: 26.5 C, 25.4 A: all outputs off
+SAMPLE DONE: 26.5 C, 25.4 A: all outputs off; reply=a5 outputs=00 expected=00
+CASE TIME C01 Normal temperature and current: 1350140 ns
+EMU RUN C01 Normal temperature and current -- verified, 5 of 8 reply bytes:
+  ./emu -d 0xF0 -t4 0x357FE65A -t2 0xF550 -r1 0xA5 -o 0x00 -t4 0x13B00050 -r4 0x007F3540
+START C02 Warm boundaries (Temp)
+SAMPLE START: exact 27 C Warm
+SAMPLE DONE: exact 27 C Warm; reply=a5 outputs=10 expected=10
+SAMPLE START: exact 32 C still Warm
+SAMPLE DONE: exact 32 C still Warm; reply=a5 outputs=10 expected=10
+CASE TIME C02 Warm boundaries (Temp): 1974160 ns
+EMU RUN C02 Warm boundaries (Temp) -- verified, 6 of 8 reply bytes:
+  ./emu -d 0xF0 -t4 0x367FE65A -t2 0xC533 -r1 0xA5 -o 0x10 -t4 0x407FE65A -t2 0xDB62 -r1 0xA5 -o 0x10 -t4 0x13B00050 -r4 0x007F4041
+START C03 Temperature Critical
+SAMPLE START: 32.5 C: Fan Max + EPO ON
+SAMPLE DONE: 32.5 C: Fan Max + EPO ON; reply=a5 outputs=a0 expected=a0
+CASE TIME C03 Temperature Critical: 1352880 ns
+EMU RUN C03 Temperature Critical -- verified, 5 of 8 reply bytes:
+  ./emu -d 0xF0 -t4 0x417FE65A -t2 0xCB43 -r1 0xA5 -o 0xA0 -t4 0x13B00050 -r4 0x017F414B
+START C04 Current boundaries
+SAMPLE START: 25.4 A Normal
+SAMPLE DONE: 25.4 A Normal; reply=a5 outputs=00 expected=00
+SAMPLE START: exact 25.6 A Warning
+SAMPLE DONE: exact 25.6 A Warning; reply=a5 outputs=40 expected=40
+SAMPLE START: exact 32 A Warning, no EPO
+SAMPLE DONE: exact 32 A Warning, no EPO; reply=a5 outputs=40 expected=40
+CASE TIME C04 Current boundaries: 1884720 ns
+EMU RUN C04 Current boundaries -- verified, 3 of 8 reply bytes:
+  ./emu -d 0xF0 -t4 0x327FE65A -t2 0x85B7 -r1 0xA5 -o 0x00 -t4 0x3280E65A -t2 0x8648 -r1 0xA5 -o 0x40 -t4 0x32A0E65A -t2 0x80AE -r1 0xA5 -o 0x40
+START C05 Current Critical
+SAMPLE START: 32.2 A: Current warning + EPO ON
+SAMPLE DONE: 32.2 A: Current warning + EPO ON; reply=a5 outputs=c0 expected=c0
+CASE TIME C05 Current Critical: 1351280 ns
+EMU RUN C05 Current Critical -- verified, 5 of 8 reply bytes:
+  ./emu -d 0xF0 -t4 0x32A1E65A -t2 0xB39F -r1 0xA5 -o 0xC0 -t4 0x13B00050 -r4 0x01A1324C
+START C06 Either fault is sufficient
+SAMPLE START: Both Critical -> Fan Max + Warning + EPO
+SAMPLE DONE: Both Critical -> Fan Max + Warning + EPO; reply=a5 outputs=e0 expected=e0
+SAMPLE START: only current Critical -> Warning + EPO
+SAMPLE DONE: only current Critical -> Warning + EPO; reply=a5 outputs=c0 expected=c0
+SAMPLE START: only temperature Critical -> Fan Max + EPO
+SAMPLE DONE: only temperature Critical -> Fan Max + EPO; reply=a5 outputs=a0 expected=a0
+CASE TIME C06 Either fault is sufficient: 1888400 ns
+EMU RUN C06 Either fault is sufficient -- verified, 3 of 8 reply bytes:
+  ./emu -d 0xF0 -t4 0x41A1E65A -t2 0xFD6B -r1 0xA5 -o 0xE0 -t4 0x32A1E65A -t2 0xB39F -r1 0xA5 -o 0xC0 -t4 0x417FE65A -t2 0xCB43 -r1 0xA5 -o 0xA0
+START C07 Both must become Normal
+SAMPLE START: Both Critical -> EPO ON
+SAMPLE DONE: Both Critical -> EPO ON; reply=a5 outputs=e0 expected=e0
+SAMPLE START: Temp 27 C / Current 25.6 A -> EPO remains ON
+SAMPLE DONE: Temp 27 C / Current 25.6 A -> EPO remains ON; reply=a5 outputs=d0 expected=d0
+SAMPLE START: Temp 26.5 C / Current 25.4 A -> safe, EPO still latched
+SAMPLE DONE: Temp 26.5 C / Current 25.4 A -> safe, EPO still latched; reply=a5 outputs=80 expected=80
+CASE TIME C07 Both must become Normal: 2128240 ns
+EMU RUN C07 Both must become Normal -- verified, 3 of 8 reply bytes:
+  ./emu -d 0xF0 -t4 0x41A1E65A -t2 0xFD6B -r1 0xA5 -o 0xE0 -t4 0x3680E65A -t2 0xC6CC -r1 0xA5 -o 0xD0 -t4 0x357FE65A -t2 0xF550 -r1 0xA5 -o 0x80 -i 0x01 -o 0x00 -i 0x00
+START C08 Warm temperature blocks recovery
+SAMPLE START: Temp 32.5 C -> Fan Max + EPO ON
+SAMPLE DONE: Temp 32.5 C -> Fan Max + EPO ON; reply=a5 outputs=a0 expected=a0
+SAMPLE START: Temp 32 C (Warm) -> EPO stays ON
+SAMPLE DONE: Temp 32 C (Warm) -> EPO stays ON; reply=a5 outputs=90 expected=90
+SAMPLE START: Temp 26.5 C (Normal) -> EPO still latched
+SAMPLE DONE: Temp 26.5 C (Normal) -> EPO still latched; reply=a5 outputs=80 expected=80
+CASE TIME C08 Warm temperature blocks recovery: 2128400 ns
+EMU RUN C08 Warm temperature blocks recovery -- verified, 3 of 8 reply bytes:
+  ./emu -d 0xF0 -t4 0x417FE65A -t2 0xCB43 -r1 0xA5 -o 0xA0 -t4 0x407FE65A -t2 0xDB62 -r1 0xA5 -o 0x90 -t4 0x357FE65A -t2 0xF550 -r1 0xA5 -o 0x80 -i 0x01 -o 0x00 -i 0x00
+START C09 Warning current blocks recovery
+SAMPLE START: Current 32.2 A -> Warning + EPO ON
+SAMPLE DONE: Current 32.2 A -> Warning + EPO ON; reply=a5 outputs=c0 expected=c0
+SAMPLE START: Current 25.6 A (Warning) -> EPO stays ON
+SAMPLE DONE: Current 25.6 A (Warning) -> EPO stays ON; reply=a5 outputs=c0 expected=c0
+  [FAIL] t=15441980000 reset refused: current still Warning: got 0x4, expected 0xc
+SAMPLE START: Current 25.4 A (Normal) -> EPO still latched
+  [FAIL] t=16184380000 Current 25.4 A (Normal) -> EPO still latched: got 0x0, expected 0x8
+SAMPLE DONE: Current 25.4 A (Normal) -> EPO still latched; reply=a5 outputs=00 expected=80
+CASE TIME C09 Warning current blocks recovery: 2366160 ns
+  [FAIL] EMU RUN C09 Warning current blocks recovery
+START C10 Invalid packets
+SAMPLE START: Temp Critical -> EPO ON
+SAMPLE DONE: Temp Critical -> EPO ON; reply=a5 outputs=a0 expected=a0
+SAMPLE START: invalid T -> rejected, EPO stays
+SAMPLE DONE: invalid T -> rejected, EPO stays; reply=3c outputs=a0 expected=a0
+SAMPLE START: bad CRC -> rejected, EPO stays
+SAMPLE DONE: bad CRC -> rejected, EPO stays; reply=5a outputs=a0 expected=a0
+CASE TIME C10 Invalid packets: 1875600 ns
+EMU RUN C10 Invalid packets -- verified, 3 of 8 reply bytes:
+  ./emu -d 0xF0 -t4 0x417FE65A -t2 0xCB43 -r1 0xA5 -o 0xA0 -t4 0x007FE65A -t2 0x93A6 -r1 0x3C -o 0xA0 -t4 0x357FE65A -t2 0xF551 -r1 0x5A -o 0xA0
+START C11 P0 reset refused until temperature and current are safe
+SAMPLE START: 32.5 C -> Fan Max + EPO ON
+SAMPLE DONE: 32.5 C -> Fan Max + EPO ON; reply=a5 outputs=a0 expected=a0
+SAMPLE START: 27 C (Warm) -> EPO latched
+SAMPLE DONE: 27 C (Warm) -> EPO latched; reply=a5 outputs=90 expected=90
+SAMPLE START: 26.5 C, 25.4 A -> safe, EPO latched
+SAMPLE DONE: 26.5 C, 25.4 A -> safe, EPO latched; reply=a5 outputs=80 expected=80
+CASE TIME C11 P0 reset refused until temperature and current are safe: 2608720 ns
+EMU RUN C11 P0 reset refused until temperature and current are safe -- verified, 3 of 8 reply bytes:
+  ./emu -d 0xF0 -t4 0x417FE65A -t2 0xCB43 -r1 0xA5 -o 0xA0 -i 0x01 -o 0xA0 -i 0x00 -t4 0x367FE65A -t2 0xC533 -r1 0xA5 -o 0x90 -i 0x01 -o 0x90 -i 0x00 -t4 0x357FE65A -t2 0xF550 -r1 0xA5 -o 0x80 -i 0x01 -o 0x00 -i 0x00
+START C12 A held P0 button never clears the EPO
+SAMPLE START: 32.2 A while P0 is held -> EPO ON
+SAMPLE DONE: 32.2 A while P0 is held -> EPO ON; reply=a5 outputs=c0 expected=c0
+SAMPLE START: safe again, P0 still held -> EPO latched
+SAMPLE DONE: safe again, P0 still held -> EPO latched; reply=a5 outputs=80 expected=80
+CASE TIME C12 A held P0 button never clears the EPO: 1743120 ns
+EMU RUN C12 A held P0 button never clears the EPO -- verified, 2 of 8 reply bytes:
+  ./emu -d 0xF0 -i 0x01 -t4 0x32A1E65A -t2 0xB39F -r1 0xA5 -o 0xC0 -t4 0x327FE65A -t2 0x85B7 -r1 0xA5 -o 0x80 -i 0x00 -i 0x01 -o 0x00 -i 0x00
+START C13 Removed commands rejected (power factor, energy)
+SAMPLE START: 231 V, 20.2 A, 25 C still accepted
+SAMPLE DONE: 231 V, 20.2 A, 25 C still accepted; reply=a5 outputs=00 expected=00
+CASE TIME C13 Removed commands rejected (power factor, energy): 1528080 ns
+EMU RUN C13 Removed commands rejected (power factor, energy) -- verified, 3 of 8 reply bytes:
+  ./emu -d 0xF0 -t4 0xA3465747 -r1 0x3C -t4 0x20810051 -r1 0x3C -t4 0x3265E75A -t2 0x5E3F -r1 0xA5 -o 0x00
+tb_dc_teammate: 13 cases, 133 checks, 2 failures
+tb_dc_teammate FAILED
+../../teammate_version/tb_dc_teammate.v:396: $finish called at 24179900000 (1ps)

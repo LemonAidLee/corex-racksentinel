@@ -1,0 +1,36 @@
+% =====================================================================
+\kicker{Guide topic 3}
+\section{Official Firmware Testbench}\label{sec:official}
+% =====================================================================
+\resultstrip{Validate the GPIO and UART integration with the organizer's firmware before any application code.}
+  {PASS: 20 checks, 0 failures on the platform}
+  {\figref{fig:official}}
+
+The organizer's \textbf{RVBL-GPIO-UART-Test-Firmware}~\cite{repos} configures P7–P4 as outputs, copies P3–P0 to P7–P4, then waits for one UART byte and echoes it. For this test the canvas carries \code{IMEM\_TESTFW} instead of the application ROM: a 1,024-word ROM whose first 21 words match the organizer's \code{firmware.txt} word for word and whose other words are \code{nop}. The rest of the exported \code{hdl.v} is identical to the application design. The official testbench (\code{tb\_official\_test.v}) drives only the top-level pins and puts a timeout on every wait, plus a global watchdog:
+\begin{enumerate}
+  \item Check that the firmware sets \code{DATADIR} to \hex{0xF0} (P7–P4 outputs).
+  \item Official GPIO test: \hex{0xA} on P3–P0 before reset is released; expect \hex{0xA} on P7–P4.
+  \item Official UART test: send \hex{0x30} on \code{rx\_i}; expect \hex{0x30} on \code{tx\_o} with valid start and stop bits.
+  \item Ordering: change P3–P0 to \hex{0x5}; P7–P4 must hold \hex{0xA} until the \hex{0x55} echo, then show \hex{0x5}.
+  \item Four further patterns (GPIO, UART): (\hex{0x2}, \hex{0x20}), (\hex{0xF}, \hex{0xA5}), (\hex{0x9}, \hex{0x00}), (\hex{0x6}, \hex{0xFF}).
+\end{enumerate}
+On the ChipInventor platform all 20 checks pass and the run ends at 1.062\,ms (26,551 cycles at 25\,MHz); Icarus Verilog 12 gives the same result. The equivalent emulator command is \code{./emu -d 0xF0 -i 0x0A -t1 0x30 -r1 0x30 -o 0xA0}.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}[t]{0.37\linewidth}
+  \vspace{0pt}
+  \evidence{\linewidth}{fig05a_platform_log.png}
+  \subcaption{Simulation log on the ChipInventor platform.}\label{fig:officiallog}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.605\linewidth}
+  \vspace{0pt}
+  \begin{minipage}{\linewidth}
+  \evidence{\linewidth}{fig05b_platform_wave.png}
+  \subcaption{Waveform of the same run in the platform viewer (0–1.05\,ms; testbench parameter rows hidden). \texttt{gpio\_out} (P7–P4) follows \texttt{pins\_in} (P3–P0) only after each echo; \texttt{tx\_byte} repeats \texttt{rx\_byte}.}\label{fig:wave}
+  \end{minipage}
+  \par\medskip\sidecaption
+  \caption[Official firmware testbench: platform log and waveform]{Official firmware on the exported design, on the ChipInventor platform. All 20 checks pass, and each new P3–P0 value reaches P7–P4 only after the next UART echo, as the firmware README specifies.}
+  \label{fig:official}
+\end{minipage}
+\end{figure}

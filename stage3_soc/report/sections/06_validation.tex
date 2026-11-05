@@ -1,0 +1,35 @@
+% =====================================================================
+\kicker{Guide topic 6}
+\section{Custom Firmware Validation and Testbench}\label{sec:validation}
+% =====================================================================
+\resultstrip{Show that the firmware meets \tabref{tab:decisions} and that the testbench detects faults.}
+  {124 checks, 0 failures; 4 of 4 faults detected}
+  {\tabref{tab:verif}, Figures~\ref{fig:matrix}–\ref{fig:applog}}
+
+The application testbench \code{tb\_data\_center\_application.v} drives only the chip pins, as \code{./emu} does, and checks every reply byte and pin value; expected CRCs come from an independent bit-serial model. \figref{fig:matrix} shows its 12 cases. Because the platform stops a simulation after about 3\,ms, each case was run on its own on the ChipInventor platform (\code{FIRST\_RUN} = \code{LAST\_RUN} = $k$); the 12 platform logs add up to 124 checks with 0 failures, and a single Icarus Verilog run of all 12 cases gives the same totals. \tabref{tab:verif} summarizes the evidence.
+
+\input{tables/table_verification}
+
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=\linewidth]{fig07_validation_matrix.pdf}
+\caption[Validation matrix of the 12 ./emu runs]{Expected behaviour of the 12 emulator runs, decoded from the verified command lines of \tabref{tab:emuruns}. Each cell is one stimulus and the reply or pin value required at that point; colour follows the rack state.}
+\label{fig:matrix}
+\end{figure}
+
+\begin{figure}[tbp]
+\centering
+\begin{minipage}{\linewidth}
+\includegraphics[width=\linewidth]{fig08a_c11_wave.pdf}
+\subcaption{Waveform of case C11 on the exported design, drawn from the VCD of the 12-case run.}\label{fig:applogwave}
+\end{minipage}
+\par\medskip
+\noindent\begin{minipage}[b]{0.6\linewidth}
+\evidence{\linewidth}{fig08b_platform_c11_log.png}
+\subcaption{Simulation log of case C11 alone on the ChipInventor platform.}\label{fig:applogtext}
+\end{minipage}\hfill
+\begin{minipage}[b]{0.37\linewidth}\sidecaption
+\caption[Application testbench: waveform and platform log of case C11]{Case C11. Two P0 presses are refused (Critical, then Warm); the third, after a safe reading, clears the EPO (P7–P4 \texttt{0x80}\,→\,\texttt{0x00}). On the platform the case passes 14 of 14 checks and prints its verified \texttt{./emu} line.}
+\label{fig:applog}
+\end{minipage}
+\end{figure}

@@ -1,0 +1,371 @@
+
+build/firmware.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+00400000 <_start>:
+  400000:	f0000437          	lui	s0,0xf0000
+  400004:	f10004b7          	lui	s1,0xf1000
+  400008:	10010db7          	lui	s11,0x10010
+  40000c:	00842283          	lw	t0,8(s0) # f0000008 <GPIO_BASE+0x8>
+  400010:	0f02e293          	ori	t0,t0,240
+  400014:	00542423          	sw	t0,8(s0)
+  400018:	00042023          	sw	zero,0(s0)
+  40001c:	000d8293          	mv	t0,s11
+  400020:	01600313          	li	t1,22
+
+00400024 <_boot_clear>:
+  400024:	0002a023          	sw	zero,0(t0)
+  400028:	00428293          	addi	t0,t0,4
+  40002c:	fff30313          	addi	t1,t1,-1
+  400030:	fe031ae3          	bnez	t1,400024 <_boot_clear>
+  400034:	10e00293          	li	t0,270
+  400038:	005da023          	sw	t0,0(s11) # 10010000 <__bss_end__>
+  40003c:	14000293          	li	t0,320
+  400040:	005da223          	sw	t0,4(s11)
+  400044:	0e600293          	li	t0,230
+  400048:	005da423          	sw	t0,8(s11)
+  40004c:	08000293          	li	t0,128
+  400050:	005da623          	sw	t0,12(s11)
+  400054:	0a000293          	li	t0,160
+  400058:	005da823          	sw	t0,16(s11)
+
+0040005c <main_loop>:
+  40005c:	2f4000ef          	jal	400350 <rx_byte_wait>
+  400060:	00050913          	mv	s2,a0
+  400064:	05a00293          	li	t0,90
+  400068:	06590e63          	beq	s2,t0,4000e4 <cmd_sample_receive>
+  40006c:	354000ef          	jal	4003c0 <rx_byte_timeout>
+  400070:	fe0586e3          	beqz	a1,40005c <main_loop>
+  400074:	00050993          	mv	s3,a0
+  400078:	348000ef          	jal	4003c0 <rx_byte_timeout>
+  40007c:	fe0580e3          	beqz	a1,40005c <main_loop>
+  400080:	00050a13          	mv	s4,a0
+  400084:	33c000ef          	jal	4003c0 <rx_byte_timeout>
+  400088:	fc058ae3          	beqz	a1,40005c <main_loop>
+  40008c:	00851513          	slli	a0,a0,0x8
+  400090:	00aa6a33          	or	s4,s4,a0
+  400094:	000102b7          	lui	t0,0x10
+  400098:	fff28293          	addi	t0,t0,-1 # ffff <DEF_CRIT+0xfebf>
+  40009c:	805902b3          	.insn	4, 0x805902b3
+  4000a0:	805982b3          	.insn	4, 0x805982b3
+  4000a4:	0b429c63          	bne	t0,s4,40015c <cmd_badcrc>
+  4000a8:	04000293          	li	t0,64
+  4000ac:	18590263          	beq	s2,t0,400230 <cmd_stage>
+  4000b0:	04100293          	li	t0,65
+  4000b4:	18590863          	beq	s2,t0,400244 <cmd_set_warm>
+  4000b8:	04300293          	li	t0,67
+  4000bc:	18590863          	beq	s2,t0,40024c <cmd_set_crit>
+  4000c0:	04600293          	li	t0,70
+  4000c4:	24590663          	beq	s2,t0,400310 <cmd_set_warn_current>
+  4000c8:	04800293          	li	t0,72
+  4000cc:	26590663          	beq	s2,t0,400338 <cmd_set_trip_current>
+  4000d0:	05000293          	li	t0,80
+  4000d4:	1a590e63          	beq	s2,t0,400290 <cmd_status>
+  4000d8:	05200293          	li	t0,82
+  4000dc:	20590663          	beq	s2,t0,4002e8 <cmd_counters>
+  4000e0:	0700006f          	j	400150 <reply_invalid>
+
+004000e4 <cmd_sample_receive>:
+  4000e4:	2dc000ef          	jal	4003c0 <rx_byte_timeout>
+  4000e8:	f6058ae3          	beqz	a1,40005c <main_loop>
+  4000ec:	00050993          	mv	s3,a0
+  4000f0:	2d0000ef          	jal	4003c0 <rx_byte_timeout>
+  4000f4:	f60584e3          	beqz	a1,40005c <main_loop>
+  4000f8:	00050a13          	mv	s4,a0
+  4000fc:	2c4000ef          	jal	4003c0 <rx_byte_timeout>
+  400100:	f4058ee3          	beqz	a1,40005c <main_loop>
+  400104:	00050a93          	mv	s5,a0
+  400108:	2b8000ef          	jal	4003c0 <rx_byte_timeout>
+  40010c:	f40588e3          	beqz	a1,40005c <main_loop>
+  400110:	00050f13          	mv	t5,a0
+  400114:	2ac000ef          	jal	4003c0 <rx_byte_timeout>
+  400118:	f40582e3          	beqz	a1,40005c <main_loop>
+  40011c:	00851513          	slli	a0,a0,0x8
+  400120:	00af6f33          	or	t5,t5,a0
+  400124:	000102b7          	lui	t0,0x10
+  400128:	fff28293          	addi	t0,t0,-1 # ffff <DEF_CRIT+0xfebf>
+  40012c:	805902b3          	.insn	4, 0x805902b3
+  400130:	805982b3          	.insn	4, 0x805982b3
+  400134:	805a02b3          	.insn	4, 0x805a02b3
+  400138:	805a82b3          	.insn	4, 0x805a82b3
+  40013c:	03e29063          	bne	t0,t5,40015c <cmd_badcrc>
+  400140:	03c0006f          	j	40017c <cmd_sample_process>
+
+00400144 <reply_ok>:
+  400144:	0a500513          	li	a0,165
+  400148:	2a8000ef          	jal	4003f0 <tx_byte>
+  40014c:	f11ff06f          	j	40005c <main_loop>
+
+00400150 <reply_invalid>:
+  400150:	03c00513          	li	a0,60
+  400154:	29c000ef          	jal	4003f0 <tx_byte>
+  400158:	f05ff06f          	j	40005c <main_loop>
+
+0040015c <cmd_badcrc>:
+  40015c:	03cda283          	lw	t0,60(s11)
+  400160:	0ff00313          	li	t1,255
+  400164:	0062f663          	bgeu	t0,t1,400170 <_badcrc_reply>
+  400168:	00128293          	addi	t0,t0,1
+  40016c:	025dae23          	sw	t0,60(s11)
+
+00400170 <_badcrc_reply>:
+  400170:	05a00513          	li	a0,90
+  400174:	27c000ef          	jal	4003f0 <tx_byte>
+  400178:	ee5ff06f          	j	40005c <main_loop>
+
+0040017c <cmd_sample_process>:
+  40017c:	0b400293          	li	t0,180
+  400180:	fc59e8e3          	bltu	s3,t0,400150 <reply_invalid>
+  400184:	0ff00293          	li	t0,255
+  400188:	fc5984e3          	beq	s3,t0,400150 <reply_invalid>
+  40018c:	fc5a02e3          	beq	s4,t0,400150 <reply_invalid>
+  400190:	fc0a80e3          	beqz	s5,400150 <reply_invalid>
+  400194:	fa5a8ee3          	beq	s5,t0,400150 <reply_invalid>
+  400198:	013da423          	sw	s3,8(s11)
+  40019c:	054da023          	sw	s4,64(s11)
+  4001a0:	00100293          	li	t0,1
+  4001a4:	045da823          	sw	t0,80(s11)
+  4001a8:	00cda283          	lw	t0,12(s11)
+  4001ac:	005a3333          	sltu	t1,s4,t0
+  4001b0:	00134313          	xori	t1,t1,1
+  4001b4:	046da223          	sw	t1,68(s11)
+  4001b8:	00500293          	li	t0,5
+  4001bc:	025a8333          	mul	t1,s5,t0
+  4001c0:	00000393          	li	t2,0
+  4001c4:	000da283          	lw	t0,0(s11)
+  4001c8:	00534a63          	blt	t1,t0,4001dc <_sm_class_done>
+  4001cc:	00100393          	li	t2,1
+  4001d0:	004da283          	lw	t0,4(s11)
+  4001d4:	0062d463          	bge	t0,t1,4001dc <_sm_class_done>
+  4001d8:	00300393          	li	t2,3
+
+004001dc <_sm_class_done>:
+  4001dc:	027da623          	sw	t2,44(s11)
+  4001e0:	035da423          	sw	s5,40(s11)
+  4001e4:	00100293          	li	t0,1
+  4001e8:	025dac23          	sw	t0,56(s11)
+  4001ec:	010da283          	lw	t0,16(s11)
+  4001f0:	0142ea63          	bltu	t0,s4,400204 <_sm_trip_epo>
+  4001f4:	02cda283          	lw	t0,44(s11)
+  4001f8:	00300313          	li	t1,3
+  4001fc:	00628463          	beq	t0,t1,400204 <_sm_trip_epo>
+  400200:	0280006f          	j	400228 <_sm_update_outputs>
+
+00400204 <_sm_trip_epo>:
+  400204:	034da283          	lw	t0,52(s11)
+  400208:	02029063          	bnez	t0,400228 <_sm_update_outputs>
+  40020c:	00100293          	li	t0,1
+  400210:	025daa23          	sw	t0,52(s11)
+  400214:	04cda283          	lw	t0,76(s11)
+  400218:	0ff00313          	li	t1,255
+  40021c:	0062f663          	bgeu	t0,t1,400228 <_sm_update_outputs>
+  400220:	00128293          	addi	t0,t0,1
+  400224:	045da623          	sw	t0,76(s11)
+
+00400228 <_sm_update_outputs>:
+  400228:	1e8000ef          	jal	400410 <update_outputs>
+  40022c:	f19ff06f          	j	400144 <reply_ok>
+
+00400230 <cmd_stage>:
+  400230:	00899293          	slli	t0,s3,0x8
+  400234:	025da023          	sw	t0,32(s11)
+  400238:	00100293          	li	t0,1
+  40023c:	025da223          	sw	t0,36(s11)
+  400240:	f05ff06f          	j	400144 <reply_ok>
+
+00400244 <cmd_set_warm>:
+  400244:	00000a93          	li	s5,0
+  400248:	0080006f          	j	400250 <set_threshold>
+
+0040024c <cmd_set_crit>:
+  40024c:	00400a93          	li	s5,4
+
+00400250 <set_threshold>:
+  400250:	024da283          	lw	t0,36(s11)
+  400254:	020da223          	sw	zero,36(s11)
+  400258:	ee028ce3          	beqz	t0,400150 <reply_invalid>
+  40025c:	020da283          	lw	t0,32(s11)
+  400260:	0132e2b3          	or	t0,t0,s3
+  400264:	000da303          	lw	t1,0(s11)
+  400268:	004dae03          	lw	t3,4(s11)
+  40026c:	00000e93          	li	t4,0
+  400270:	01da9663          	bne	s5,t4,40027c <_set_critical>
+  400274:	00028313          	mv	t1,t0
+  400278:	0080006f          	j	400280 <_set_check>
+
+0040027c <_set_critical>:
+  40027c:	00028e13          	mv	t3,t0
+
+00400280 <_set_check>:
+  400280:	edc358e3          	bge	t1,t3,400150 <reply_invalid>
+  400284:	015d8eb3          	add	t4,s11,s5
+  400288:	005ea023          	sw	t0,0(t4)
+  40028c:	eb9ff06f          	j	400144 <reply_ok>
+
+00400290 <cmd_status>:
+  400290:	ec0990e3          	bnez	s3,400150 <reply_invalid>
+  400294:	02cda283          	lw	t0,44(s11)
+  400298:	044da303          	lw	t1,68(s11)
+  40029c:	00231313          	slli	t1,t1,0x2
+  4002a0:	0062e2b3          	or	t0,t0,t1
+  4002a4:	034da303          	lw	t1,52(s11)
+  4002a8:	00331313          	slli	t1,t1,0x3
+  4002ac:	0062e2b3          	or	t0,t0,t1
+  4002b0:	038da303          	lw	t1,56(s11)
+  4002b4:	00631313          	slli	t1,t1,0x6
+  4002b8:	0062e2b3          	or	t0,t0,t1
+  4002bc:	024da303          	lw	t1,36(s11)
+  4002c0:	00731313          	slli	t1,t1,0x7
+  4002c4:	0062e533          	or	a0,t0,t1
+  4002c8:	128000ef          	jal	4003f0 <tx_byte>
+  4002cc:	028da503          	lw	a0,40(s11)
+  4002d0:	120000ef          	jal	4003f0 <tx_byte>
+  4002d4:	040da503          	lw	a0,64(s11)
+  4002d8:	118000ef          	jal	4003f0 <tx_byte>
+  4002dc:	04cda503          	lw	a0,76(s11)
+  4002e0:	110000ef          	jal	4003f0 <tx_byte>
+  4002e4:	d79ff06f          	j	40005c <main_loop>
+
+004002e8 <cmd_counters>:
+  4002e8:	e60994e3          	bnez	s3,400150 <reply_invalid>
+  4002ec:	03cda503          	lw	a0,60(s11)
+  4002f0:	100000ef          	jal	4003f0 <tx_byte>
+  4002f4:	00000513          	li	a0,0
+  4002f8:	0f8000ef          	jal	4003f0 <tx_byte>
+  4002fc:	00000513          	li	a0,0
+  400300:	0f0000ef          	jal	4003f0 <tx_byte>
+  400304:	00000513          	li	a0,0
+  400308:	0e8000ef          	jal	4003f0 <tx_byte>
+  40030c:	d51ff06f          	j	40005c <main_loop>
+
+00400310 <cmd_set_warn_current>:
+  400310:	e40980e3          	beqz	s3,400150 <reply_invalid>
+  400314:	010da283          	lw	t0,16(s11)
+  400318:	e259fce3          	bgeu	s3,t0,400150 <reply_invalid>
+  40031c:	013da623          	sw	s3,12(s11)
+  400320:	040da283          	lw	t0,64(s11)
+  400324:	0132b2b3          	sltu	t0,t0,s3
+  400328:	0012c293          	xori	t0,t0,1
+  40032c:	045da223          	sw	t0,68(s11)
+  400330:	0e0000ef          	jal	400410 <update_outputs>
+  400334:	e11ff06f          	j	400144 <reply_ok>
+
+00400338 <cmd_set_trip_current>:
+  400338:	0ff00293          	li	t0,255
+  40033c:	e0598ae3          	beq	s3,t0,400150 <reply_invalid>
+  400340:	00cda283          	lw	t0,12(s11)
+  400344:	e132f6e3          	bgeu	t0,s3,400150 <reply_invalid>
+  400348:	013da823          	sw	s3,16(s11)
+  40034c:	df9ff06f          	j	400144 <reply_ok>
+
+00400350 <rx_byte_wait>:
+  400350:	00008d13          	mv	s10,ra
+
+00400354 <_rxw_loop>:
+  400354:	0084a283          	lw	t0,8(s1) # f1000008 <UART_BASE+0x8>
+  400358:	0022f293          	andi	t0,t0,2
+  40035c:	00029663          	bnez	t0,400368 <_rxw_got>
+  400360:	018000ef          	jal	400378 <check_reset>
+  400364:	ff1ff06f          	j	400354 <_rxw_loop>
+
+00400368 <_rxw_got>:
+  400368:	0004a423          	sw	zero,8(s1)
+  40036c:	0044a503          	lw	a0,4(s1)
+  400370:	000d0093          	mv	ra,s10
+  400374:	00008067          	ret
+
+00400378 <check_reset>:
+  400378:	00008c93          	mv	s9,ra
+  40037c:	00442703          	lw	a4,4(s0)
+  400380:	00177713          	andi	a4,a4,1
+  400384:	054da303          	lw	t1,84(s11)
+  400388:	04edaa23          	sw	a4,84(s11)
+  40038c:	02070663          	beqz	a4,4003b8 <_cr_ret>
+  400390:	02031463          	bnez	t1,4003b8 <_cr_ret>
+  400394:	034da283          	lw	t0,52(s11)
+  400398:	02028063          	beqz	t0,4003b8 <_cr_ret>
+  40039c:	02cda283          	lw	t0,44(s11)
+  4003a0:	00029c63          	bnez	t0,4003b8 <_cr_ret>
+  4003a4:	040da283          	lw	t0,64(s11)
+  4003a8:	00cda303          	lw	t1,12(s11)
+  4003ac:	0062f663          	bgeu	t0,t1,4003b8 <_cr_ret>
+  4003b0:	020daa23          	sw	zero,52(s11)
+  4003b4:	05c000ef          	jal	400410 <update_outputs>
+
+004003b8 <_cr_ret>:
+  4003b8:	000c8093          	mv	ra,s9
+  4003bc:	00008067          	ret
+
+004003c0 <rx_byte_timeout>:
+  4003c0:	00bec337          	lui	t1,0xbec
+
+004003c4 <_rxt_loop>:
+  4003c4:	0084a283          	lw	t0,8(s1)
+  4003c8:	0022f293          	andi	t0,t0,2
+  4003cc:	00029a63          	bnez	t0,4003e0 <_rxt_got>
+  4003d0:	fff30313          	addi	t1,t1,-1 # bebfff <_sidata+0x7ebbb3>
+  4003d4:	fe0318e3          	bnez	t1,4003c4 <_rxt_loop>
+  4003d8:	00000593          	li	a1,0
+  4003dc:	00008067          	ret
+
+004003e0 <_rxt_got>:
+  4003e0:	0004a423          	sw	zero,8(s1)
+  4003e4:	0044a503          	lw	a0,4(s1)
+  4003e8:	00100593          	li	a1,1
+  4003ec:	00008067          	ret
+
+004003f0 <tx_byte>:
+  4003f0:	0084a283          	lw	t0,8(s1)
+  4003f4:	0042f293          	andi	t0,t0,4
+  4003f8:	fe028ce3          	beqz	t0,4003f0 <tx_byte>
+  4003fc:	00a4a023          	sw	a0,0(s1)
+  400400:	0084a283          	lw	t0,8(s1)
+  400404:	0012e293          	ori	t0,t0,1
+  400408:	0054a423          	sw	t0,8(s1)
+  40040c:	00008067          	ret
+
+00400410 <update_outputs>:
+  400410:	00000393          	li	t2,0
+  400414:	02cda283          	lw	t0,44(s11)
+  400418:	00028a63          	beqz	t0,40042c <_uo_current>
+  40041c:	01000393          	li	t2,16
+  400420:	00100313          	li	t1,1
+  400424:	00628463          	beq	t0,t1,40042c <_uo_current>
+  400428:	02000393          	li	t2,32
+
+0040042c <_uo_current>:
+  40042c:	044da303          	lw	t1,68(s11)
+  400430:	00030463          	beqz	t1,400438 <_uo_epo>
+  400434:	0403e393          	ori	t2,t2,64
+
+00400438 <_uo_epo>:
+  400438:	034da303          	lw	t1,52(s11)
+  40043c:	00030463          	beqz	t1,400444 <_uo_write>
+  400440:	0803e393          	ori	t2,t2,128
+
+00400444 <_uo_write>:
+  400444:	00742023          	sw	t2,0(s0)
+  400448:	00008067          	ret
+
+Disassembly of section .riscv.attributes:
+
+00000000 <.riscv.attributes>:
+   0:	2241                	.insn	2, 0x2241
+   2:	0000                	.insn	2, 0x0000
+   4:	7200                	.insn	2, 0x7200
+   6:	7369                	.insn	2, 0x7369
+   8:	01007663          	bgeu	zero,a6,14 <PIN_FAN_BOOST+0x4>
+   c:	0018                	.insn	2, 0x0018
+   e:	0000                	.insn	2, 0x0000
+  10:	7205                	.insn	2, 0x7205
+  12:	3376                	.insn	2, 0x3376
+  14:	6932                	.insn	2, 0x6932
+  16:	7032                	.insn	2, 0x7032
+  18:	5f31                	.insn	2, 0x5f31
+  1a:	6d7a                	.insn	2, 0x6d7a
+  1c:	756d                	.insn	2, 0x756d
+  1e:	316c                	.insn	2, 0x316c
+  20:	3070                	.insn	2, 0x3070
+	...

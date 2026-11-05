@@ -1,0 +1,11 @@
+% =====================================================================
+\kicker{Results and outlook}
+\section{Conclusion}\label{sec:conclusion}
+% =====================================================================
+RackSentinel integrates GPIO and UART with the reused RVBL-2 core through one decoder change and eight native Inout Pin blocks, and the organizer's firmware passes on the exported design. The 275-instruction application verifies each packet with \code{crcb}, scales the temperature with \code{mul}, and holds the EPO until a new P0 press arrives under safe conditions. The design passes 124 of 124 checks across 12 cases, each run on the ChipInventor platform and each available as an \code{./emu} run for the FPGA stage, and the testbench detects all four faults planted in the latch logic.
+
+\needspace{9\baselineskip}
+\subsection*{References}
+{\renewcommand{\section}[2]{}%
+ \sffamily\footnotesize\RaggedRight\setlength{\itemsep}{0pt}%
+ \bibliographystyle{unsrt}\bibliography{references}}

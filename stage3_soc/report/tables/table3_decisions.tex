@@ -1,0 +1,21 @@
+% Table 3 -- Decision table: every rule of Sections 4.1 and 4.3 in one place
+% (cmd_sample_process, check_reset, update_outputs in dc_teammate.s).
+\newcommand{\swatch}[1]{\tikz[baseline=-0.6ex]\fill[#1] (0,-0.9ex) rectangle (0.9ex,0.6ex);\hspace{0.35em}}
+\begin{table}[H]
+\caption[Decision table: conditions, triggers and pins]{Decision table: each condition the firmware evaluates, its trigger and basis, the pins it drives and the value \texttt{./emu -o} reads. Pin values add, e.g.\ \texttt{0xE0} = fans max + warning + EPO.}
+\label{tab:decisions}
+{\tablestyle
+\begin{tabularx}{\linewidth}{@{}P{30mm}LP{50mm}P{11mm}@{}}
+\toprule
+\colhead{Condition} & \colhead{Trigger and basis} & \colhead{Pins driven} & \colhead{\texttt{-o}}\\
+\midrule
+\swatch{teal}Normal & inlet below 27.0\,°C, inside the ASHRAE recommended range & none & \hex{0x00}\\
+\swatch{amber!45}Warm & 27.0\,°C ≤ inlet ≤ 32.0\,°C & P4 fan boost & \hex{0x10}\\
+\swatch{alarm}Critical temperature & inlet above 32.0\,°C, the class A1 allowable maximum & P5 fans at maximum + P7 EPO & \hex{0xA0}\\
+\swatch{amber}Current warning & I ≥ 25.6\,A (80\,\% of the 32\,A feed); follows the latest reading & P6 current warning & \hex{0x40}\\
+\swatch{alarm}Current trip & I above 32.0\,A, the feed rating & P6 warning + P7 EPO & \hex{0xC0}\\
+\swatch{alarm}EPO latched & stays on after its cause is gone, until a valid reset & P7 EPO (+ current P4–P6) & \hex{0x80}\\
+\swatch{teal}EPO reset & new P0 press while the inlet is Normal and I < 25.6\,A & releases P7; a held button never does & —\\
+\bottomrule
+\end{tabularx}}
+\end{table}

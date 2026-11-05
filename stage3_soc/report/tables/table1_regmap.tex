@@ -1,0 +1,17 @@
+% Table 1 -- Memory map and peripheral registers (Block Guide, Stage 3; Addr_dec.v, DMEM.v)
+\begin{table}[H]
+\caption[Memory map and peripheral registers]{Memory map and peripheral registers, from the Block Guide Stage 3 register maps~\cite{blockguide} and \texttt{Addr\_dec.v}.}
+\label{tab:regmap}
+{\tablestyle
+\begin{tabularx}{\linewidth}{@{}P{27mm}P{27mm}L@{}}
+\toprule
+\colhead{Block} & \colhead{Base address} & \colhead{Registers (offset) / contents}\\
+\midrule
+IMEM (ROM) & \hex{0x0040\_0000} & \code{IMEM\_Data\_Center} (275 words) or the official test firmware (21 words)\\
+DMEM & \hex{0x1001\_0000} & 8\,KB SRAM (2,048 words); application state in 22 words, cleared at boot\\
+GPIO & \hex{0xF000\_0000} & \code{DATAOUT} (\hex{0x0}), \code{DATAIN} (\hex{0x4}), \code{DATADIR} (\hex{0x8}; 1 = output)\\
+GPIO\_PIN\_SPLIT & none (wiring) & none; per pin \code{C} = \code{DATAOUT}[$k$], \code{D} = \code{DATADIR}[$k$], \code{P} = pin\\
+UART & \hex{0xF100\_0000} & \code{TXDATA} (\hex{0x0}), \code{RXDATA} (\hex{0x4}), \code{CONTROL} (\hex{0x8}): \code{TRANSMIT} bit~0, \code{RXDONE} bit~1, \code{TXDONE} bit~2\\
+\bottomrule
+\end{tabularx}}
+\end{table}

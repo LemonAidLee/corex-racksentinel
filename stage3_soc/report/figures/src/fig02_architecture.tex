@@ -1,0 +1,89 @@
+% Figure 2 -- SoC integration architecture (v2 export, stage3_design-2026.09.29_ver2).
+% GPIO_PADS is replaced by GPIO_PIN_SPLIT + eight ChipInventor Inout Pin blocks.
+\documentclass[border=0pt]{standalone}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds}
+\input{../../fonts.tex}
+\input{../../palette.tex}
+\RSTikzStyles
+\begin{document}
+\begin{tikzpicture}[x=1mm,y=1mm]
+  % ---------------- clock/reset note ----------------
+  \node[lbl, anchor=west, font=\sffamily\scriptsize\itshape] at (0,73) {\texttt{clk\_i}, \texttt{rst\_i} reach every block};
+
+  % ---------------- core ----------------
+  \fill[navy] (0,4) rectangle (38,68);
+  \node[text=white, font=\sffamily\bfseries\normalsize, anchor=north] at (19,66) {RVBL-2 core};
+  \node[text=white!80!navy, font=\sffamily\scriptsize, anchor=north] at (19,61.2) {Stage 2 multicycle, reused};
+  \node[text=white, font=\sffamily\scriptsize, align=center, anchor=north, text width=34mm] at (19,54)
+    {Control Unit (FSM)\\[1.3pt] PC, IR, Register File\\[1.3pt] ALU\\[1.3pt]
+     \textbf{MULT} (Zmmul)\\[1.3pt] \textbf{CRC16} (Xicrc)\\[1.3pt] Imm.\ gen., LSU\\[1.3pt]
+     Branch comparator\\[1.3pt] Datapath muxes};
+
+  % ---------------- bus + decoder ----------------
+  \draw[<->, navy, line width=1.8pt] (38,36) -- (50,36) node[midway, above=0.6mm, lbl] {bus};
+  \draw[river, line width=1.1pt, fill=riversoft] (50,4) rectangle (72,68);
+  \node[font=\sffamily\bfseries\small, text=navy, align=center] at (61,60) {Address\\decoder};
+  \node[font=\sffamily\scriptsize, align=center, text width=19mm] at (61,38)
+     {selects the block from the upper address bits;\\[2pt] steers \texttt{o\_Data} back to the core};
+  \node[font=\sffamily\tiny\bfseries, text=river, align=center] at (61,9.5) {ONLY CORE BLOCK\\CHANGED IN STAGE 3};
+
+  % ---------------- bus slaves ----------------
+  \begin{scope}[every node/.append style={minimum width=40mm, minimum height=11.5mm, text width=38mm, align=center}]
+    \node[blk] (imem) at (97.5,61) {\textbf{IMEM ROM}\enspace\texttt{0x0040\_0000}\\[-1pt]
+          {\scriptsize \texttt{IMEM\_Data\_Center}, 275 words\\[-2pt] or \texttt{IMEM\_TESTFW}, 21 words}};
+    \node[blk] (dmem) at (97.5,45) {\textbf{DMEM}\enspace\texttt{0x1001\_0000}\\[-1pt]{\scriptsize 8\,KB SRAM; 22 words of state}};
+    \node[periph] (gpio) at (97.5,29) {\textbf{GPIO}\enspace\texttt{0xF000\_0000}\\[-1pt]{\scriptsize DATAOUT, DATAIN, DATADIR}};
+    \node[periph] (uart) at (97.5,13) {\textbf{UART}\enspace\texttt{0xF100\_0000}\\[-1pt]{\scriptsize TXDATA, RXDATA, CONTROL\\[-2pt]\texttt{TX\_ON\_TXDATA\_WRITE = 0}}};
+  \end{scope}
+  \foreach \n in {imem,dmem,gpio,uart} \draw[<->, navy, line width=0.7pt] (72,0|-\n.west) -- (\n.west);
+  \node[lbl, font=\sffamily\scriptsize\itshape, text=slate, align=left, anchor=west] at (119.6,63.5)
+       {firmware lives only here:\\swap the ROM, keep\\the hardware};
+  \draw[thin, -{Stealth[length=3pt]}] (119.2,61) -- (imem.east);
+
+  % ---------------- GPIO_PIN_SPLIT + eight Inout Pins ----------------
+  \node[periph, minimum width=20mm, minimum height=13mm, align=center] (split) at (138,29)
+       {\textbf{GPIO\_PIN\_}\\[-2pt]\textbf{SPLIT}\\[-1pt]{\scriptsize bus ↔ 8 pins}};
+  \draw[gpio,->] (gpio.east|-0,31.5) -- (split.west|-0,31.5) node[midway, above=-0.2mm, lbl, font=\sffamily\tiny] {out, oe};
+  \draw[gpio,<-] (gpio.east|-0,26.5) -- (split.west|-0,26.5) node[midway, below=-0.2mm, lbl, font=\sffamily\tiny] {in};
+  \foreach \k in {0,...,7} {
+    \pgfmathsetmacro{\px}{127.8+\k*2.75}
+    \draw[navy, line width=0.45pt] (\px+1,35.5) -- (\px+1,40);
+    \draw[navy, line width=0.55pt, fill=white] (\px,40) rectangle ++(2,4.4);
+  }
+  \node[lbl, anchor=south, align=center, text=navy, font=\sffamily\tiny] at (138.8,44.5)
+       {8 Inout Pin blocks, \texttt{D\,?\,C\,:\,1'bz}};
+  \node[font=\ttfamily\scriptsize\bfseries, text=navy, anchor=south] at (138.8,47.6) {pins\_io\_0 … pins\_io\_7};
+
+  % ---------------- UART pins ----------------
+  \draw[uart,->] (uart.east|-0,15.5) -- (154,15.5)
+        node[pos=0.55, above=0.2mm, font=\ttfamily\scriptsize\bfseries, text=river] {tx\_o};
+  \draw[uart,<-] (uart.east|-0,10.5) -- (154,10.5)
+        node[pos=0.55, below=0.2mm, font=\ttfamily\scriptsize\bfseries, text=river] {rx\_i};
+
+  % ---------------- external stimulus ----------------
+  \node[ext, minimum width=22mm, minimum height=62mm, anchor=north east] (emu) at (178,68) {};
+  \node[font=\ttfamily\small\bfseries, text=slate] at (167,62.5) {./emu};
+  \node[font=\sffamily\scriptsize, text=slate, align=center, text width=20mm] at (167,57) {test host,\\outside the chip};
+  \node[font=\sffamily\scriptsize, text=slate, align=center, text width=20mm] at (167,36)
+       {\texttt{-d 0xF0}\\[2pt] drives P0\\with \texttt{-i}\\[2pt] checks P7–P4\\with \texttt{-o}};
+  \node[font=\sffamily\scriptsize, text=slate, align=center, text width=20mm] at (167,13)
+       {sends \texttt{-t4}, \texttt{-t2}\\expects \texttt{-r}};
+  \draw[gpio,<->, draw=slate, dashed] (149.8,42.2) -- (emu.west|-0,42.2);
+  \draw[uart,dashed] (154,15.5) -- (emu.west|-0,15.5);
+  \draw[uart,dashed] (154,10.5) -- (emu.west|-0,10.5);
+
+  % ---------------- legend + note ----------------
+  \begin{scope}[shift={(0,-5.4)}]
+    \fill[riversoft] (0,0) rectangle (4,2.6); \draw[river, line width=0.6pt] (0,0) rectangle (4,2.6);
+    \node[lbl, anchor=west] at (4.8,1.3) {new or changed in Stage 3};
+    \draw[navy, line width=0.7pt, fill=white] (40,0) rectangle (44,2.6);
+    \node[lbl, anchor=west] at (44.8,1.3) {existing block};
+    \draw[slate, dashed, line width=0.6pt] (66,0) rectangle (70,2.6);
+    \node[lbl, anchor=west] at (70.8,1.3) {external test host};
+    \node[lbl, anchor=east, font=\sffamily\scriptsize\itshape, text=navy] at (178,1.3)
+       {Only the decoder knows the memory map; GPIO and UART decode bits 11:2.};
+  \end{scope}
+\end{tikzpicture}
+\end{document}

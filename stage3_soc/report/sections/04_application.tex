@@ -1,0 +1,56 @@
+% =====================================================================
+\kicker{Guide topic 4}
+\section{Application Definition}\label{sec:app}
+% =====================================================================
+\resultstrip{Define the input, processing and output of the rack controller and its emulator interface.}
+  {8 commands, 7 decision rules, 12 emulator runs}
+  {Tables~\ref{tab:commands}–\ref{tab:emuruns}}
+
+\subsection{System context}\label{sec:context}
+The controller protects one server rack in a Johor data hall, one of the fastest-growing data-centre locations in the region. The temperature thresholds follow the ASHRAE thermal guideline for data-processing environments~\cite{ashrae}: the recommended inlet range ends at \textbf{27\,°C} (Warm from this value) and the class A1 allowable maximum is \textbf{32\,°C} (Critical above it). The rack is fed by a 32\,A, 230\,V circuit. With the usual limit of 80\,\% of a breaker's rating for a continuous load, the warning level is $I_{\text{warn}} = 0.8 \times 32\,\mathrm{A} = \mathbf{25.6\,A}$, and a current above the 32\,A rating trips the EPO.
+
+\subsection{System input}\label{sec:input}
+Readings arrive as one 6-byte \textbf{SAMPLE} packet: header \hex{0x5A}, voltage in 1\,V steps, current in 0.2\,A steps and temperature in 0.5\,°C steps, then the CRC (example below). Configuration and status use 4-byte commands, \code{[CMD]\allowbreak[DATA]\allowbreak[CRC\_LO]\allowbreak[CRC\_HI]} (\tabref{tab:commands}). Both formats end with a CRC-16-CCITT (polynomial \hex{0x1021}, seed \hex{0xFFFF}, the CCSDS frame check~\cite{ccsds}) over the preceding bytes. P0 is the operator reset button; P1–P3 are not used.
+
+\smallskip
+\noindent\begin{tikzpicture}[x=1mm,y=1mm]
+  \foreach \i/\n/\v/\m/\c in {0/HEAD/5A/SAMPLE/navy,1/V/E6/230\,V/navy,2/I/7F/25.4\,A/navy,3/T/41/32.5\,°C/navy,4/CRC\_LO/43/{}/river,5/CRC\_HI/CB/{}/river}{
+     \draw[\c, line width=0.7pt, fill=\ifnum\i<4 white\else riversoft\fi] ({\i*15.9},3) rectangle ({\i*15.9+14.6},14);
+     \node[font=\sffamily\tiny\bfseries, text=\c] at ({\i*15.9+7.3},11.8) {\n};
+     \node[font=\ttfamily\small, text=ink] at ({\i*15.9+7.3},8.2) {0x\v};
+     \node[font=\sffamily\tiny, text=slate] at ({\i*15.9+7.3},4.7) {\m};}
+  \draw[->, slate, line width=0.5pt] (0,0.8) -- (94,0.8);
+  \node[lbl, anchor=west, fill=white] at (38,0.8) {sent first\enspace→\enspace sent last};
+  \node[kicker, anchor=west] at (100,13) {PACKET ANATOMY:\enspace CASE C03, 230\,V · 25.4\,A · 32.5\,°C};
+  \node[lbl, anchor=west] at (100,9.3) {CRC-16 of the first four bytes\,=\,\hex{0xCB43}, low byte first};
+  \node[font=\ttfamily\small\bfseries, text=river, anchor=west] at (100,4.8) {-t4 0x417FE65A -t2 0xCB43};
+  \node[lbl, anchor=west] at (100,1.2) {the same packet as \texttt{./emu} options (\secref{sec:emu})};
+\end{tikzpicture}
+
+\input{tables/table2_commands}
+
+\subsection{System processing and output}\label{sec:processing}
+\tabref{tab:decisions} is the complete rule set. A packet with a bad CRC or out-of-range data receives its reply (\hex{0x5A} or \hex{0x3C}) and changes no state. Classification uses the latest SAMPLE; a reading of exactly 32.0\,°C remains Warm, and exactly 32.0\,A remains a warning. Each complete packet receives one reply.
+
+\input{tables/table3_decisions}
+
+\subsection{Emulator values (./emu)}\label{sec:emu}
+\noindent\begin{minipage}[t]{0.4\linewidth}
+\vspace{0pt}\RaggedRight
+The organizer's emulator~\cite{repos} drives the pins and the UART of the FPGA top. Each run resets the processor and stores at most 8 reply bytes. Every register access waits 50\,ms, so consecutive UART bytes reach the chip at least 100\,ms apart. \tabref{tab:emuruns} lists the 12 demonstration runs, which use the options on the right.
+\end{minipage}\hfill
+\begin{minipage}[t]{0.575\linewidth}
+\vspace{0pt}
+{\tablestyle\rowcolors{1}{white}{mist!70}
+\begin{tabularx}{\linewidth}{@{}P{17mm}L@{}}
+\toprule
+\emu{-d 0xF0} & P7–P4 observed by the emulator, P3–P0 driven by it\\
+\emu{-i V} & Drive P3–P0: \hex{0x01} presses P0, \hex{0x00} releases it\\
+\emu{-o V} & Compare P7–P4 with V\\
+\emu{-t4}, \emu{-t2} & Send 4 or 2 bytes, least-significant first: SAMPLE \emu{-t4 0x\{T\}\{I\}\{V\}5A -t2 0x\{CRC\}}; command \emu{-t4 0x\{CRC\}\{DATA\}\{CMD\}}\\
+\emu{-rN V} & Expect N reply bytes; the first byte is the least significant\\
+\bottomrule
+\end{tabularx}}
+\end{minipage}
+
+\input{tables/table4_emuruns}

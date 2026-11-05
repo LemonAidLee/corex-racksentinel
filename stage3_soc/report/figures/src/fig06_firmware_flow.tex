@@ -1,0 +1,97 @@
+% Figure 6 -- Firmware decision flow of dc_teammate.s (275 instructions).
+% Every box is taken from the source: main_loop, cmd_sample_*, set_*, cmd_status,
+% cmd_counters, check_reset, rx_byte_*, tx_byte, update_outputs.
+\documentclass[border=0pt]{standalone}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds}
+\input{../../fonts.tex}
+\input{../../palette.tex}
+\RSTikzStyles
+\tikzset{
+  fstep/.style={draw=navy, line width=0.6pt, fill=white, align=left, anchor=north west,
+               inner sep=2.2pt, font=\sffamily\scriptsize, text=ink},
+  io/.style={fstep, draw=river, fill=riversoft},
+  flow/.style={->, navy, line width=0.7pt},
+  lane/.style={font=\sffamily\bfseries\tiny, text=white, rotate=90},
+}
+\newcommand{\lanebar}[4]{% y-bottom, y-top, colour, label
+  \fill[#3] (0,#1) rectangle (4.2,#2);
+  \node[lane] at (2.1,{(#1+#2)/2}) {#4};}
+\begin{document}
+\begin{tikzpicture}[x=1mm,y=1mm]
+  % ---------------- lanes ----------------
+  \lanebar{66}{86}{river}{RECEIVE}
+  \lanebar{47}{63}{navy}{VERIFY}
+  \lanebar{17}{44}{navy}{DECIDE}
+  \lanebar{0}{14}{teal}{ACT}
+  \foreach \y in {64.5,45.5,15.5} \draw[hair, line width=0.3pt, dash pattern=on 1pt off 1.5pt] (6,\y) -- (178,\y);
+
+  % ---------------- RECEIVE ----------------
+  \node[fstep, text width=33mm, minimum height=19mm] (boot) at (7,86)
+    {\textbf{\footnotesize Boot}\\ \texttt{DATADIR |= 0xF0}, pins off\\ 22 state words cleared\\ 27.0 / 32.0\,°C, 25.6 / 32.0\,A,\\ 230\,V};
+  \node[io, text width=51mm, minimum height=19mm] (wait) at (45.5,86)
+    {\textbf{\footnotesize Wait for CMD}\enspace\texttt{rx\_byte\_wait}\\
+     polls \texttt{RXDONE} with no time limit; between\\ polls \texttt{check\_reset}: a \emph{new} P0 press clears\\ a latched EPO only if the inlet is Normal\\ and the current is below 25.6\,A};
+  \node[io, text width=66mm, minimum height=19mm] (rd) at (104,86)
+    {\textbf{\footnotesize Read the rest}\enspace\texttt{rx\_byte\_timeout}\\
+     SAMPLE \texttt{0x5A}: V, I, T, CRC\_LO, CRC\_HI (5 bytes)\\
+     any other CMD: DATA, CRC\_LO, CRC\_HI (3 bytes)\\
+     each byte waits up to 12,500,992 loops ($\approx$\,1.0\,s at 250\,MHz)\\
+     \textcolor{slate}{timeout: fragment dropped silently, no reply}};
+  \draw[flow] (boot.east|-0,76.5) -- (wait.west|-0,76.5);
+  \draw[flow, river] (wait.east|-0,76.5) -- (rd.west|-0,76.5);
+
+  % ---------------- VERIFY ----------------
+  \node[fstep, text width=66mm, minimum height=13mm] (crc) at (104,62)
+    {\textbf{\footnotesize CRC check}\enspace CRC-16, seed \texttt{0xFFFF}, one \texttt{crcb} per byte\\
+     SAMPLE: 4 × \texttt{crcb} over \texttt{5A}, V, I, T\\
+     command: 2 × \texttt{crcb} over CMD, DATA};
+  \node[fstep, draw=slate, text width=44mm, minimum height=13mm] (bad) at (47,62)
+    {\textbf{\footnotesize Mismatch}\enspace reply \texttt{0x5A}\\ saturating reject counter +1;\\ nothing is executed; wait again};
+  \draw[flow] (137,67) -- (137,62);
+  \draw[flow, slate] (crc.west|-0,55.5) -- (bad.east|-0,55.5) node[midway, above=0.1mm, lbl] {mismatch};
+
+  % ---------------- DECIDE ----------------
+  \node[fstep, fill=mist, draw=navy, text width=166.2mm, minimum height=5mm, align=left] (disp) at (7,43.5)
+    {\textbf{\footnotesize Dispatch on CMD}\qquad\textcolor{slate}{unknown CMD or out-of-range data: reply \texttt{0x3C}}};
+  \draw[flow] (137,48.8) -- (137,43.5) node[pos=0.1, right=0.3mm, lbl] {match};
+  \def\hw{32.1}
+  \foreach \i/\x in {0/7,1/41.3,2/75.6,3/109.9,4/144.2} { \coordinate (h\i) at (\x,36.5); }
+  \node[fstep, text width=\hw mm, minimum height=19.5mm] (t) at (h0)
+    {\textbf{\footnotesize SAMPLE} \texttt{0x5A}\\ V 180–254, I ≤ 254, T 1–254\\ 0.1\,°C = 5 × T (\texttt{mul})\\
+     class vs 27 / 32\,°C\\ warning I ≥ 25.6\,A};
+  \node[fstep, draw=alarm, text width=\hw mm, minimum height=19.5mm] (c) at (h1)
+    {\textbf{\footnotesize EPO trip}\enspace\textcolor{alarm}{(in SAMPLE)}\\ Critical (> 32\,°C) or\\ I > 32\,A trips the EPO;\\
+     it \textbf{latches}; trip\\ counter +1 (saturating)};
+  \node[fstep, text width=\hw mm, minimum height=19.5mm] (l) at (h2)
+    {\textbf{\footnotesize SET TEMP} \texttt{0x40/41/43}\\ STAGE\_HIGH, then\\ SET\_WARM or SET\_CRIT;\\
+     committed only if\\ Warm < Critical};
+  \node[fstep, text width=\hw mm, minimum height=19.5mm] (s) at (h3)
+    {\textbf{\footnotesize SET CURRENT} \texttt{0x46/48}\\ warning: 1 … trip − 1\\ trip: above warning,\\
+     not 255; warning\\ flag re-evaluated};
+  \node[fstep, text width=\hw mm, minimum height=19.5mm] (q) at (h4)
+    {\textbf{\footnotesize STATUS} \texttt{0x50}\\ flags, temperature,\\ current, EPO trips\\
+     \textbf{COUNTERS} \texttt{0x52}\\ CRC rejects, 0, 0, 0};
+  \foreach \n in {t,l,s,q} \draw[flow] (\n.north|-0,38) -- (\n.north);
+  \draw[flow, alarm] (t.east|-0,27) -- (c.west|-0,27);
+
+  % ---------------- ACT ----------------
+  \node[fstep, draw=teal, text width=80mm, minimum height=12.5mm] (out) at (7,13.8)
+    {\textbf{\footnotesize update\_outputs}\enspace one \texttt{sw} to \texttt{DATAOUT}\\
+     \textcolor{amber!85!black}{P4 fan boost (Warm)\enspace P5 fans max (Critical)\enspace P6 current warning}\\
+     \textcolor{alarm}{P7 EPO, held while latched}};
+  \node[io, text width=77.2mm, minimum height=12.5mm] (rep) at (92.8,13.8)
+    {\textbf{\footnotesize Reply}\enspace\texttt{tx\_byte}: wait for \texttt{TXDONE}, write \texttt{TXDATA},\\
+     then set \texttt{TRANSMIT} by read-modify-write\\
+     one \texttt{A5}/\texttt{3C}/\texttt{5A}, or 4 bytes for STATUS/COUNTERS};
+  \foreach \n in {c,l,s,q} \draw[navy, line width=0.5pt] (\n.south) -- (\n.south|-0,15.1);
+  \draw[navy, line width=0.5pt] (t.south) -- (t.south|-0,15.1);
+  \draw[navy, line width=0.5pt] (t.south|-0,15.1) -- (q.south|-0,15.1);
+  \draw[flow] (48,15.1) -- (48,13.8);
+  \draw[flow] (130,15.1) -- (130,13.8);
+  % loop back to Wait
+  \draw[flow, river] (rep.east|-0,7.5) -- (176,7.5) |- (100,89) -| (wait.north)
+       node[pos=0.25, above=0.2mm, lbl, text=river] {next packet};
+\end{tikzpicture}
+\end{document}

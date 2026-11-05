@@ -1,0 +1,19 @@
+VCD info: dumpfile testbench.vcd opened for output.
+======================================================
+ Official Stage 3 GPIO/UART Firmware Test
+======================================================
+[PASS] GPIO: P3-P0 = 0xA, P7-P4 = 0xA
+[PASS] UART: RX = 0x30, TX = 0x30
+Equivalent ./emu: -d 0xF0 -i 0x0A -t1 0x30 -r1 0x30 -o 0xA0
+[PASS] Firmware ordering: GPIO update occurs after UART echo
+
+[ADDITIONAL VERIFICATION]
+[PASS] Test 1: GPIO 0x2 -> 0x2 | UART 0x20 -> 0x20
+[PASS] Test 2: GPIO 0xf -> 0xf | UART 0xa5 -> 0xa5
+[PASS] Test 3: GPIO 0x9 -> 0x9 | UART 0x00 -> 0x00
+[PASS] Test 4: GPIO 0x6 -> 0x6 | UART 0xff -> 0xff
+
+Internal checks: 20, failures: 0
+[PASS] GPIO and UART firmware test completed successfully
+======================================================
+../tb_official_final.v:396: $finish called at 1062040000 (1ps)

@@ -1,0 +1,19 @@
+% Table 2 -- Command set of dc_teammate.s (.equ block and dispatch chain)
+\begin{table}[H]
+\caption[Command set]{Command set. Replies: \texttt{0xA5} accepted, \texttt{0x5A} bad CRC (nothing executed), \texttt{0x3C} invalid or unknown.}
+\label{tab:commands}
+{\tablestyle
+\begin{tabularx}{\linewidth}{@{}P{15mm}P{35mm}P{37mm}P{14mm}L@{}}
+\toprule
+\colhead{CMD} & \colhead{Name} & \colhead{Data} & \colhead{Reply} & \colhead{Effect}\\
+\midrule
+\hex{0x5A} & SAMPLE & V 180–254; I 0–254; T 1–254 & A5 / 3C & Store V and I; T\,×\,5 (\code{mul}) → 0.1\,°C; classify; current warning; EPO trip\\
+\hex{0x40} & STAGE\_HIGH & high byte & A5 & Stage the high byte of a temperature threshold\\
+\hex{0x41} / \hex{0x43} & SET\_WARM / SET\_CRIT & low byte & A5 / 3C & Commit (0.1\,°C units) only after STAGE\_HIGH and only if Warm < Critical\\
+\hex{0x46} / \hex{0x48} & SET\_WARN\_CURRENT / SET\_TRIP\_CURRENT & raw 1 to trip$-$1 / above warning, not 255 & A5 / 3C & Current warning level (default 128 = 25.6\,A) / trip level (default 160 = 32.0\,A)\\
+\hex{0x50} & STATUS & 0 & 4 bytes & Flags (class, warning, EPO, temperature received, staged), temperature, current, EPO trips\\
+\hex{0x52} & COUNTERS & 0 & 4 bytes & CRC rejects, then three zero bytes\\
+other & any other value & — & 3C & Unknown command: nothing executed\\
+\bottomrule
+\end{tabularx}}
+\end{table}

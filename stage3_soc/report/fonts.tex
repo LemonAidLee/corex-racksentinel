@@ -1,0 +1,33 @@
+% =====================================================================
+%  Typography: IBM Plex superfamily (OFL, ships with TeX Live/MiKTeX
+%  package "plex-otf"). Serif for reading, Sans for structure and
+%  diagrams, Mono for code/logs, Plex Math for equations.
+% =====================================================================
+\usepackage{fontspec}
+\usepackage{unicode-math}
+\defaultfontfeatures{Ligatures=TeX}
+\setmainfont{IBMPlexSerif}[
+  Extension=.otf, Scale=0.92,
+  UprightFont=*-Regular, BoldFont=*-SemiBold,
+  ItalicFont=*-Italic, BoldItalicFont=*-SemiBoldItalic]
+\setsansfont{IBMPlexSans}[
+  Extension=.otf, Scale=0.95,
+  UprightFont=*-Regular, BoldFont=*-SemiBold,
+  ItalicFont=*-Italic, BoldItalicFont=*-SemiBoldItalic]
+\setmonofont{IBMPlexMono}[
+  Extension=.otf, Scale=0.95, HyphenChar=None,
+  UprightFont=*-Regular, BoldFont=*-SemiBold,
+  ItalicFont=*-Italic, BoldItalicFont=*-SemiBoldItalic]
+\setmathfont{IBMPlexMath-Regular.otf}[Scale=0.95]
+% Additional weights used for hierarchy
+\newfontfamily\sanslight{IBMPlexSans}[Extension=.otf, Scale=0.95,
+  UprightFont=*-Light, ItalicFont=*-LightItalic, BoldFont=*-Medium]
+\newfontfamily\sansmedium{IBMPlexSans}[Extension=.otf, Scale=0.95,
+  UprightFont=*-Medium, BoldFont=*-Bold]
+\newfontfamily\sanscond{IBMPlexSansCondensed}[Extension=.otf, Scale=0.95,
+  UprightFont=*-Regular, BoldFont=*-SemiBold,
+  ItalicFont=*-Italic, BoldItalicFont=*-SemiBoldItalic]
+\newfontfamily\sansdisplay{IBMPlexSans}[Extension=.otf,
+  UprightFont=*-Bold, BoldFont=*-Bold]
+\newfontfamily\sansthin{IBMPlexSans}[Extension=.otf,
+  UprightFont=*-ExtraLight, BoldFont=*-Light]

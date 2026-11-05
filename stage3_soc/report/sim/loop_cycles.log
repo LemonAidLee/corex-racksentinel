@@ -1,0 +1,7 @@
+loop iteration: 20 cycles
+loop iteration: 20 cycles
+loop iteration: 20 cycles
+loop iteration: 20 cycles
+loop iteration: 20 cycles
+timeout at 250 MHz = 1.000 s
+tb_loop_cycles.v:33: $finish called at 122900000 (1ps)

@@ -1,0 +1,84 @@
+% Figure 1 -- System concept (v2): rack context -> inputs -> RVBL-2 -> outputs.
+% Facts from teammate_version/dc_teammate.s (275 instructions) and README.md.
+\documentclass[border=0pt]{standalone}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds}
+\input{../../fonts.tex}
+\input{../../palette.tex}
+\RSTikzStyles
+\begin{document}
+\begin{tikzpicture}[x=1mm,y=1mm]
+  % ---------------- column kickers ----------------
+  \node[kicker, anchor=west] at (0,66) {INPUTS\enspace\textcolor{hair}{|}\enspace THE RACK AND ITS MANAGER};
+  \node[kicker] at (93,66) {PROCESSING ON THE CHIP};
+  \node[kicker, anchor=east] at (178,66) {OUTPUTS\enspace\textcolor{hair}{|}\enspace ACTION AT THE RACK};
+
+  % ---------------- inputs (left) ----------------
+  \begin{scope}[every node/.append style={minimum width=46mm, minimum height=7.4mm, align=left, text width=42mm}]
+    \node[soft, anchor=west] (dcim) at (0,55) {\textbf{DCIM} management system\\[-1pt]{\scriptsize\color{slate}thresholds, STATUS, COUNTERS}};
+    \node[soft, anchor=west] (vlt)  at (0,45.5) {\textbf{PDU voltage} reading\\[-1pt]{\scriptsize\color{slate}1\,V per step, 180–254\,V}};
+    \node[soft, anchor=west] (cur)  at (0,36) {\textbf{PDU current} transformer\\[-1pt]{\scriptsize\color{slate}0.2\,A per step}};
+    \node[soft, anchor=west] (tmp)  at (0,26.5) {\textbf{Inlet temperature} sensor\\[-1pt]{\scriptsize\color{slate}0.5\,°C per step}};
+    \node[soft, anchor=west] (rst)  at (0,12) {\textbf{Operator reset} button\hfill\texttt{P0}};
+  \end{scope}
+  \begin{scope}[on background layer]
+    \node[draw=slate, dashed, line width=0.5pt, fit=(dcim)(rst), inner sep=2.2mm] (emu) {};
+  \end{scope}
+  \node[lbl, anchor=north west, font=\sffamily\scriptsize\itshape] at ($(emu.south west)+(0,-0.6)$)
+     {In the demo, \texttt{./emu} plays every role.};
+  \node[lbl, anchor=west, font=\sffamily\scriptsize\itshape] at (1,19.3) {V, I and T travel together in one 6-byte SAMPLE packet};
+
+  % ---------------- chip (centre) ----------------
+  \def\cx{69}\def\cw{50}
+  \fill[white] (\cx,2) rectangle (\cx+\cw,62);
+  \fill[navy]  (\cx,53) rectangle (\cx+\cw,62);
+  \draw[navy, line width=1pt] (\cx,2) rectangle (\cx+\cw,62);
+  \node[text=white, font=\sffamily\bfseries\normalsize] at (\cx+\cw/2,59.3) {RVBL-2 SoC};
+  \node[text=white!85!navy, font=\sffamily\scriptsize] at (\cx+\cw/2,55.3) {RV32I + Zmmul + Xicrc\enspace·\enspace 25\,MHz};
+  \begin{scope}[every node/.style={draw=hair, fill=mist, line width=0.4pt, minimum width=44mm,
+        minimum height=7.6mm, align=center, font=\sffamily\scriptsize, text=ink, inner sep=1pt}]
+    \node (s1) at (\cx+\cw/2,46) {\textbf{\small 1\; Verify the packet}\\CRC-16 over 4 bytes, 4 × \texttt{crcb}};
+    \node (s2) at (\cx+\cw/2,36.5) {\textbf{\small 2\; Check and convert}\\range checks; 5\,×\,raw\,→\,0.1\,°C (\texttt{mul})};
+    \node (s3) at (\cx+\cw/2,27) {\textbf{\small 3\; Classify}\\temperature 27 / 32\,°C; current 25.6 / 32\,A};
+    \node (s4) at (\cx+\cw/2,17.5) {\textbf{\small 4\; Decide and protect}\\latching EPO; safe P0 reset only};
+  \end{scope}
+  \foreach \a/\b in {s1/s2,s2/s3,s3/s4} \draw[->, navy, line width=0.6pt] (\a) -- (\b);
+  \node[font=\sffamily\scriptsize, text=slate] at (\cx+\cw/2,7.2) {firmware \texttt{main.s}};
+  \node[font=\sffamily\scriptsize, text=slate] at (\cx+\cw/2,4.3) {275 instructions};
+
+  % ---------------- UART (river blue) ----------------
+  \foreach \n in {dcim,vlt,cur,tmp} \draw[uart] (\n.east) -- (57,0|-\n.east);
+  \draw[uart] (57,55) -- (57,26.5);
+  \draw[uart,->] (57,42) -- (\cx,42) node[pos=0.5, above=0.4mm, font=\ttfamily\scriptsize, text=river] {rx\_i}
+                                     node[pos=0.5, below=0.2mm, opt] {-t4 -t2};
+  \draw[uart,->] (\cx,59) -- (dcim.east|-0,59)
+        node[pos=0.36, above=0.2mm, font=\ttfamily\scriptsize, text=river] {tx\_o}
+        node[pos=0.36, below=0.1mm, opt] {-r};
+  \node[lbl, text=river, align=center] at (63,31) {UART\\115200\\8-N-1};
+
+  % ---------------- GPIO input (navy) ----------------
+  \draw[gpio,->] (rst.east) -- (\cx,12);
+  \node[font=\ttfamily\scriptsize, text=navy] at (60,14.6) {P0};
+  \node[opt, text=navy] at (60,9.4) {-i};
+
+  % ---------------- outputs (right) ----------------
+  \begin{scope}[every node/.append style={minimum width=46mm, minimum height=8.2mm, align=left,
+        text width=42mm, line width=0.7pt, inner sep=2pt}]
+    \node[blk, sWarn, anchor=east] (p4) at (178,51) {\texttt{P4}\enspace\textbf{Fan boost}\\[-1pt]{\scriptsize\color{slate}inlet Warm, 27–32\,°C}};
+    \node[blk, sWarn, anchor=east] (p5) at (178,40.5) {\texttt{P5}\enspace\textbf{Fans at maximum}\\[-1pt]{\scriptsize\color{slate}inlet Critical, above 32\,°C}};
+    \node[blk, sWarn, anchor=east] (p6) at (178,30) {\texttt{P6}\enspace\textbf{Current warning}\\[-1pt]{\scriptsize\color{slate}at or above 25.6\,A (80\,\%)}};
+    \node[blk, sCrit, anchor=east] (p7) at (178,19.5) {\texttt{P7}\enspace\textbf{Emergency power-off}\\[-1pt]{\scriptsize\color{slate}Critical or above 32\,A; latched}};
+  \end{scope}
+  \draw[gpio] (\cx+\cw,35) -- (125,35);
+  \draw[gpio] (125,51) -- (125,19.5);
+  \foreach \p in {p4,p5,p6} \draw[gpio,->] (125,0|-\p.west) -- (\p.west);
+  \draw[draw=alarm, line width=0.9pt,->] (125,19.5) -- (p7.west);
+  \node[font=\ttfamily\scriptsize, text=navy, fill=white, inner sep=1pt] at (125,56) {P7–P4};
+  \node[opt, text=navy] at (128.5,12.5) {-o};
+
+  % ---------------- key message ----------------
+  \node[anchor=east, align=right, font=\sffamily\scriptsize\itshape, text=navy, text width=48mm]
+     at (178,6.5) {The EPO is decided on the chip;\\only a safe, new P0 press releases it.};
+\end{tikzpicture}
+\end{document}

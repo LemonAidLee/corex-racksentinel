@@ -1,0 +1,104 @@
+% =====================================================================
+%  Page 1 -- Front cover: identity, team, links, key results
+% =====================================================================
+\thispagestyle{empty}
+\begingroup
+\noindent
+{\sffamily\fontsize{7.6}{9}\selectfont\color{navy}\bfseries\addfontfeatures{LetterSpace=16}%
+ CHAMPIONCHIP eXPERIENCE MALAYSIA\hfill{\color{river}PHASE 3\enspace·\enspace DESIGN SUBMISSION REPORT}}\par
+\vspace{2.5mm}
+\noindent{\color{navy}\rule{\linewidth}{1.4pt}}\par
+\vspace{22mm}
+
+\noindent{\sffamily\bfseries\small\color{river}\addfontfeatures{LetterSpace=14}GUIDE TOPICS 1–6\enspace·\enspace RVBL-2 RISC-V SOC}\par
+\vspace{4mm}
+\noindent{\sansdisplay\fontsize{58}{58}\selectfont\color{navy}RackSentinel}\par
+\vspace{6mm}
+\noindent\begin{minipage}{0.84\linewidth}
+{\sanslight\fontsize{17}{22}\selectfont\color{ink}A data-centre rack thermal and current guardian on the \mbox{RVBL-2} RISC-V SoC with GPIO and UART}
+\end{minipage}\par
+\vspace{15mm}
+
+% ------------------------- identity graphic -------------------------
+\noindent\begin{tikzpicture}[x=0.9mm,y=1mm]
+  % UART frame of the SAMPLE header byte 0x5A: idle, start, b0..b7 (LSB first), stop
+  \def\bw{8.2}\def\lo{30}\def\hi{40}\def\xo{8}
+  \node[kicker, anchor=west, text=river] at (0,51)
+      {ONE SAMPLE HEADER BYTE ON rx\_i:\enspace 0x5A\enspace·\enspace 8-N-1\enspace·\enspace LSB FIRST\enspace·\enspace 115200 BAUD};
+  % levels: start 0, b0..b7 of 0x5A = 0 1 0 1 1 0 1 0, stop 1
+  \draw[uart, line width=1.4pt] (0,\hi) -- (\xo,\hi) -- (\xo,\lo)
+      -- ++(2*\bw,0) -- ++(0,\hi-\lo) -- ++(\bw,0) -- ++(0,\lo-\hi) -- ++(\bw,0)
+      -- ++(0,\hi-\lo) -- ++(2*\bw,0) -- ++(0,\lo-\hi) -- ++(\bw,0)
+      -- ++(0,\hi-\lo) -- ++(\bw,0) -- ++(0,\lo-\hi) -- ++(\bw,0)
+      -- ++(0,\hi-\lo) -- (110,\hi);
+  \foreach \i/\t in {0/start,1/b0,2/b1,3/b2,4/b3,5/b4,6/b5,7/b6,8/b7,9/stop}{
+     \draw[hair, line width=0.3pt] ({\xo+\i*\bw},{\lo-1.5}) -- ({\xo+\i*\bw},{\hi+2});
+     \node[lbl, font=\sffamily\tiny] at ({\xo+(\i+0.5)*\bw},{\lo-3.4}) {\t};}
+  \draw[hair, line width=0.3pt] ({\xo+10*\bw},{\lo-1.5}) -- ({\xo+10*\bw},{\hi+2});
+  \foreach \i/\v in {1/0,2/1,3/0,4/1,5/1,6/0,7/1,8/0}{
+     \node[font=\ttfamily\scriptsize, text=river] at ({\xo+(\i+0.5)*\bw},{\hi+4.4}) {\v};}
+  % chip
+  \fill[navy] (110,12) rectangle (146,56);
+  \foreach \y in {16,22,...,52} { \draw[navy, line width=1pt] (107.5,\y) -- (110,\y); \draw[navy, line width=1pt] (146,\y) -- (148.5,\y); }
+  \node[text=white, font=\sffamily\bfseries\large] at (128,41) {RVBL-2};
+  \node[text=white!80!navy, font=\sffamily\scriptsize, align=center] at (128,31.5) {RV32I\\Zmmul · Xicrc\\25\,MHz};
+  % pins out
+  \foreach \y/\c/\t in {50/amber/{P4\enspace fan boost},41/amber/{P5\enspace fans at maximum},32/amber/{P6\enspace current warning},23/alarm/{P7\enspace emergency power-off}}{
+     \draw[\c, line width=1.4pt, -{Stealth[length=4pt]}] (148.5,\y) -- (156,\y);
+     \node[anchor=west, font=\sffamily\small, text=ink] at (156.5,\y) {\t};}
+  % thermal classes
+  \node[kicker, anchor=west] at (0,16.5) {RACK INLET CLASSES, FROM THE ASHRAE THERMAL GUIDELINE};
+  \fill[tealsoft]  (0,6) rectangle (40,12);   \draw[teal, line width=0.6pt]  (0,6) rectangle (40,12);
+  \fill[ambersoft] (40,6) rectangle (72,12);  \draw[amber, line width=0.6pt] (40,6) rectangle (72,12);
+  \fill[alarmsoft] (72,6) rectangle (104,12); \draw[alarm, line width=0.6pt] (72,6) rectangle (104,12);
+  \node[font=\sffamily\scriptsize\bfseries, text=teal!70!black] at (20,9) {Normal};
+  \node[font=\sffamily\scriptsize\bfseries, text=amber!70!black] at (56,9) {Warm};
+  \node[font=\sffamily\scriptsize\bfseries, text=alarm] at (88,9) {Critical};
+  \foreach \x/\t in {40/27,72/32}{ \node[font=\sffamily\scriptsize, text=slate] at (\x,3.2) {\t\,°C}; }
+  \node[font=\sffamily\scriptsize\itshape, text=slate, anchor=west] at (110,3.2) {signal in, decision on the chip, action at the rack};
+\end{tikzpicture}\par
+\vfill
+
+% ------------------------- key results -------------------------
+\noindent{\coverlabel{Key results}}
+\noindent{\sffamily\small\color{ink}\textbf{\color{navy}SoC}\enspace RVBL-2 core (RV32I + Zmmul + Xicrc) with GPIO (8 pins) and UART (115200 8-N-1), 25\,MHz}\par
+\vspace{2.5mm}
+\noindent\begin{tabular}{@{}*{2}{p{0.315\linewidth}@{\hspace{0.0275\linewidth}}}p{0.315\linewidth}@{}}
+\coverstat[navy]{275}{instructions}{\code{main.s}, 1,100\,B, 8 commands; CRC-16 with \code{crcb}, 0.1\,°C with \code{mul}; latching EPO} &
+\coverstat{PASS}{official test firmware}{on the ChipInventor platform: 20 checks, 0 failures; GPIO \hex{0xA} to \hex{0xA}, UART \hex{0x30} to \hex{0x30} (\secref{sec:official})} &
+\coverstat{124\,/\,0}{checks\,/\,failures}{team testbench \code{tb\_data\_center\_application.v}, 12 cases, each also run on the platform (\secref{sec:validation})}\\[3mm]
+\coverstat{12\,/\,12}{\code{./emu} runs verified}{each from reset, $\le$\,8 reply bytes, $\le$\,2.61\,ms of simulated time (\secref{sec:emu}, \secref{sec:validation})} &
+\coverstat{4\,/\,4}{planted firmware bugs caught}{mutation test of the latching-EPO logic (\secref{sec:validation})} &
+\coverstat{0 of 18,472}{bit-error patterns missed}{by CRC-16 on the 6-byte packet; an 8-bit XOR checksum misses 80 (\secref{sec:crc})}
+\end{tabular}\par
+\vspace{1.5mm}
+\noindent{\sffamily\scriptsize\itshape\color{slate}Results from the ChipInventor platform and Icarus Verilog runs of the exported design; \secref{sec:validation} lists each test.}\par
+\vspace{11mm}
+
+% ------------------------- team and links -------------------------
+\noindent{\color{navy}\rule{\linewidth}{0.8pt}}\par\vspace{4mm}
+\noindent\begin{minipage}[t]{0.20\linewidth}
+  \coverlabel{Team}
+  {\sffamily\fontsize{16}{19}\selectfont\bfseries\color{navy}CoreX}\\[1pt]
+  {\sffamily\small\color{slate}Group 31}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.34\linewidth}
+  \coverlabel{Members}
+  {\sffamily\small\color{ink}Law Hui Tan\\ Chia Jing Xiang\\ Ooi Chin Ming\\ Lee Wen Yi\\ Leow Jia Jun}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.44\linewidth}
+  \coverlabel{Links}
+  {\sffamily\small\color{ink}Video:\enspace\href{https://youtu.be/03oN4n_qd6s?si=G52xxw6TRxy75T5m}{\color{river}YouTube}\\[1pt]
+   {\fontsize{5.6}{6.6}\selectfont\ttfamily\color{slate}\RaggedRight
+    \url{https://youtu.be/03oN4n_qd6s?si=G52xxw6TRxy75T5m}\par}\vspace{2pt}
+   Source, firmware and testbenches:\\
+   \href{https://drive.google.com/drive/folders/1wFDAOJwkhgssV14Z5MkH3YdpN-Mq0FtX?usp=drive_link}{\color{river}Google Drive folder}\\[1pt]
+   {\fontsize{5.6}{6.6}\selectfont\ttfamily\color{slate}\RaggedRight
+    \url{https://drive.google.com/drive/folders/1wFDAOJwkhgssV14Z5MkH3YdpN-Mq0FtX?usp=drive_link}\par}\vspace{2pt}
+   GitHub repository:\\
+   \href{https://github.com/LemonAidLee/Equipe31_RackSentinel}{\color{river}GitHub repo}\\[1pt]
+   {\fontsize{5.6}{6.6}\selectfont\ttfamily\color{slate}\RaggedRight
+    \url{https://github.com/LemonAidLee/Equipe31_RackSentinel}\par}}
+\end{minipage}\par
+\endgroup
+\clearpage

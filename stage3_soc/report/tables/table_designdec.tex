@@ -1,0 +1,18 @@
+% Table 2 -- Integration design decisions (GPIO.v, GPIO_PIN_SPLIT.v, UART.v, top.v)
+\begin{table}[H]
+\caption[Integration design decisions]{Integration design decisions and their rationale.}
+\label{tab:designdec}
+{\tablestyle
+\begin{tabularx}{\linewidth}{@{}P{22mm}P{68mm}L@{}}
+\toprule
+\colhead{Area} & \colhead{Decision} & \colhead{Rationale}\\
+\midrule
+GPIO reset & All pins are inputs; \code{DATAOUT} = 0 & No pin is driven before the firmware writes \code{DATADIR}.\\
+GPIO input & 2-flop synchronizer before \code{DATAIN}; in output mode a pin's \code{DATAIN} bit holds its last input value & Pins are asynchronous to the clock; the Guide isolates the input buffer of an output pin (§1.3.1)~\cite{blockguide}.\\
+Pin tristate & \code{GPIO\_PIN\_SPLIT} feeds eight 1-bit Inout Pin blocks: \code{pins\_io\_$k$ = D ? C : 1\sq bz} & An 8-bit Inout Pin applies one enable to all pins, and the export drops a custom block's \code{inout} port; scalar pins avoid both without editing \code{hdl.v}.\\
+UART baud & $N = 25\ \mathrm{MHz} / 115\,200 = 217$ clocks per bit & Integer divisor of the system clock; 0.01\,\% baud error.\\
+UART transmit & A frame starts only when \code{TRANSMIT} is set (\code{TX\_ON\_TXDATA\_WRITE = 0}); \code{TRANSMIT} self-clears; \code{TXDONE} = 1 when idle & Specified behaviour: writing \code{TXDATA} only loads the byte.\\
+UART receive & Synchronized input; start bit re-checked at half a bit; one sample per bit centre; frame dropped if the stop bit is low; \code{RXDONE} cleared by writing 0, and a byte arriving in the same cycle takes priority & Rejects glitches and framing errors without oversampling; no received byte is lost at the clear.\\
+\bottomrule
+\end{tabularx}}
+\end{table}

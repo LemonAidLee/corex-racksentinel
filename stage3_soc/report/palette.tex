@@ -1,0 +1,54 @@
+% =====================================================================
+%  RackSentinel visual system -- shared palette and TikZ vocabulary.
+%  Loaded by main.tex (via rackstyle.sty) and by every standalone
+%  figure source in figures/src/, so text and diagrams stay identical.
+%
+%  Colour carries meaning, never decoration:
+%    navy    structure, headings, the processor
+%    river   UART / data flow / links
+%    teal    Normal state, PASS, verified
+%    amber   Warm / Hot / overload (warning)
+%    alarm   Critical / EPO only
+%    mist    panels and quiet backgrounds
+%    ink     body text
+% =====================================================================
+\definecolor{navy}{HTML}{15304B}
+\definecolor{river}{HTML}{2A6FA8}
+\definecolor{teal}{HTML}{1E8573}
+\definecolor{amber}{HTML}{C9821A}
+\definecolor{alarm}{HTML}{B5382C}
+\definecolor{mist}{HTML}{EEF2F6}
+\definecolor{mistdark}{HTML}{D9E1EA}
+\definecolor{ink}{HTML}{24292F}
+\definecolor{slate}{HTML}{5E6B78}
+\definecolor{hair}{HTML}{B7C2CD}
+% soft tints for state fills (still distinct in greyscale)
+\definecolor{tealsoft}{HTML}{DCEFEA}
+\definecolor{ambersoft}{HTML}{F7E7CC}
+\definecolor{alarmsoft}{HTML}{F4D9D5}
+\definecolor{riversoft}{HTML}{DDE9F4}
+
+\newcommand{\RSTikzStyles}{%
+\tikzset{
+  >={Stealth[length=4.2pt,width=3.4pt]},
+  every node/.style={font=\sffamily\small, text=ink},
+  % blocks
+  blk/.style={draw=navy, line width=0.7pt, fill=white, inner sep=3pt,
+              align=center, minimum height=8mm},
+  core/.style={blk, fill=navy, text=white, draw=navy},
+  soft/.style={blk, fill=mist, draw=hair, line width=0.5pt},
+  periph/.style={blk, fill=riversoft, draw=river},
+  ext/.style={blk, draw=slate, dashed, line width=0.6pt, fill=white},
+  % state chips
+  sNormal/.style={fill=tealsoft, draw=teal},
+  sWarn/.style={fill=ambersoft, draw=amber},
+  sCrit/.style={fill=alarmsoft, draw=alarm},
+  % wires
+  uart/.style={draw=river, line width=1.1pt},
+  gpio/.style={draw=navy, line width=0.9pt},
+  bus/.style={draw=navy, line width=2.2pt},
+  thin/.style={draw=slate, line width=0.5pt},
+  lbl/.style={font=\sffamily\scriptsize, text=slate, inner sep=1.5pt},
+  opt/.style={font=\ttfamily\scriptsize, text=river, inner sep=1.5pt},
+  kicker/.style={font=\sffamily\tiny\bfseries, text=slate, inner sep=0pt},
+}}

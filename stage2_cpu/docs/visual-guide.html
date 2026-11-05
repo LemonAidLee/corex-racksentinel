@@ -1,0 +1,1296 @@
+<title>Anatomy of a Multicycle RISC-V</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  --ground:#F3F5F3; --surface:#FFFFFF; --surface-2:#E8ECEA; --surface-3:#DEE4E1;
+  --ink:#111817; --ink-2:#4C5A57; --ink-3:#7B8986;
+  --rule:#D3DAD7; --rule-2:#B6C0BC;
+  --accent:#0B7663; --accent-ink:#075346; --accent-soft:#DBEEE9;
+  --signal:#8A6208; --signal-soft:#F5EAD3;
+  --alert:#AC3020; --alert-soft:#F7E3DF;
+  --scope-bg:#080C0D; --scope-line:#1D2A2A; --scope-trace:#3ED2B3;
+  --scope-ink:#C9D6D3; --scope-dim:#6C7C79; --scope-hi:#E9B052; --scope-alert:#E86A57;
+  --shadow:0 1px 2px rgba(17,24,23,.05),0 8px 24px -12px rgba(17,24,23,.18);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0A0F10; --surface:#131A1B; --surface-2:#1A2324; --surface-3:#222C2D;
+    --ink:#DFE7E5; --ink-2:#9AAAA7; --ink-3:#71817E;
+    --rule:#242F2F; --rule-2:#35423F;
+    --accent:#3ED2B3; --accent-ink:#8FE8D4; --accent-soft:#0D2925;
+    --signal:#E0AE4E; --signal-soft:#2A2113;
+    --alert:#E8695A; --alert-soft:#2D1714;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0A0F10; --surface:#131A1B; --surface-2:#1A2324; --surface-3:#222C2D;
+  --ink:#DFE7E5; --ink-2:#9AAAA7; --ink-3:#71817E;
+  --rule:#242F2F; --rule-2:#35423F;
+  --accent:#3ED2B3; --accent-ink:#8FE8D4; --accent-soft:#0D2925;
+  --signal:#E0AE4E; --signal-soft:#2A2113;
+  --alert:#E8695A; --alert-soft:#2D1714;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -14px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:16px; line-height:1.62; margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;font-weight:700;text-wrap:balance;margin:0;letter-spacing:-.01em}
+code,.mono,kbd{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+a{color:var(--accent-ink);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+/* ---------- shell ---------- */
+html{overflow-x:clip}
+main{display:block;width:100%}
+.wrap{max-width:1160px;margin:0 auto;padding:0 clamp(16px,3.5vw,28px)}
+
+/* ---------- contents bar (plain flex, no grid nesting) ---------- */
+.toc{display:flex;flex-wrap:wrap;gap:6px 8px;padding:16px 0;border-bottom:1px solid var(--rule);
+  position:sticky;top:0;background:var(--ground);z-index:5}
+.toc a{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;
+  border:1px solid var(--rule);font-size:12.5px;color:var(--ink-2);text-decoration:none;
+  background:var(--surface);white-space:nowrap;transition:border-color .12s,color .12s}
+.toc a:hover{border-color:var(--accent);color:var(--ink)}
+.toc a .n{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--accent-ink)}
+
+/* ---------- hero ---------- */
+header.hero{padding:64px 0 40px;border-bottom:1px solid var(--rule)}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:18px}
+h1{font-size:clamp(38px,6.4vw,66px);line-height:1.02;letter-spacing:-.025em;max-width:16ch}
+.hero .deck{font-size:19px;line-height:1.55;color:var(--ink-2);max-width:60ch;margin-top:20px}
+.hero .deck strong{color:var(--ink);font-weight:600}
+
+.specs{display:grid;grid-template-columns:repeat(2,1fr);gap:0;margin-top:38px;
+  border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
+@media(min-width:640px){.specs{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:1100px){.specs{grid-template-columns:repeat(8,1fr)}}
+.spec{padding:14px 16px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.spec dt{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.spec dd{margin:5px 0 0;font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:500;font-variant-numeric:tabular-nums}
+.spec dd.ok{color:var(--accent)}
+.spec dd.wip{color:var(--signal)}
+
+/* ---------- sections ---------- */
+section{padding:clamp(46px,6vw,68px) 0;border-bottom:1px solid var(--rule);min-width:0}
+code{overflow-wrap:anywhere}
+section:last-of-type{border-bottom:0}
+.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:8px}
+.sec-num{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent);letter-spacing:.08em;flex:none}
+h2{font-size:clamp(27px,3.6vw,36px);line-height:1.1}
+.sub{color:var(--ink-2);max-width:66ch;margin:14px 0 0;font-size:17px}
+.prose{max-width:66ch}
+.prose p{margin:16px 0}
+.prose p:first-child{margin-top:20px}
+
+/* ---------- eli5 pull ---------- */
+.eli5{border-left:3px solid var(--accent);background:var(--accent-soft);padding:14px 18px;margin:24px 0;
+  max-width:66ch;border-radius:0 3px 3px 0}
+.eli5 b{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--accent-ink);display:block;margin-bottom:5px}
+.eli5 p{margin:0;font-size:15.5px;line-height:1.55;color:var(--ink)}
+.warn{border-left-color:var(--alert);background:var(--alert-soft)}
+.warn b{color:var(--alert)}
+
+/* ---------- figures ---------- */
+figure{margin:34px 0 0;background:var(--surface);border:1px solid var(--rule);border-radius:4px;
+  overflow:hidden;box-shadow:var(--shadow)}
+figure .fig-body{padding:clamp(14px,2vw,22px);overflow-x:auto}
+figure svg{display:block;max-width:100%;height:auto;margin:0 auto;min-width:720px}
+figure .scope svg{min-width:900px}
+figcaption{border-top:1px solid var(--rule);background:var(--surface-2);padding:11px 18px;
+  font-size:13.5px;line-height:1.5;color:var(--ink-2)}
+figcaption .fno{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--accent);margin-right:9px}
+
+/* ---------- cast grid ---------- */
+.cast{display:grid;grid-template-columns:repeat(1,1fr);gap:1px;
+  background:var(--rule);border:1px solid var(--rule);margin-top:34px;border-radius:4px;overflow:hidden;
+  padding:0;list-style:none}
+@media(min-width:640px){.cast{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:960px){.cast{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1280px){.cast{grid-template-columns:repeat(4,1fr)}}
+.cast li{list-style:none;background:var(--surface);padding:15px 16px;display:flex;flex-direction:column;gap:5px;min-width:0}
+.cast .blk{overflow-wrap:anywhere}
+.cast .kit{font-size:14.5px;color:var(--ink-2)}
+.cast .kit .ico{font-size:17px;margin-right:6px}
+.cast .blk{font-family:"IBM Plex Mono",monospace;font-size:13.5px;font-weight:600;color:var(--accent-ink)}
+.cast .job{font-size:13px;line-height:1.45;color:var(--ink-3)}
+
+/* ---------- tables ---------- */
+.tw{overflow-x:auto;margin-top:28px;border:1px solid var(--rule);border-radius:4px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--rule);vertical-align:top}
+thead th{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--ink-3);background:var(--surface-2);font-weight:500;white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+td.m,th.m{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tag{font-family:"IBM Plex Mono",monospace;font-size:11px;padding:1px 6px;border-radius:3px;
+  background:var(--surface-3);color:var(--ink-2);white-space:nowrap}
+.tag.a{background:var(--accent-soft);color:var(--accent-ink)}
+.tag.s{background:var(--signal-soft);color:var(--signal)}
+.tag.x{background:var(--alert-soft);color:var(--alert)}
+
+/* ---------- svg diagram shared ---------- */
+.dg{font-family:"IBM Plex Mono",monospace}
+.dg .bx{fill:var(--surface-2);stroke:var(--rule-2);stroke-width:1.2}
+.dg .bx-t{fill:var(--ink);font-size:12px;font-weight:500}
+.dg .bx-s{fill:var(--ink-3);font-size:9.5px}
+.dg .wire{fill:none;stroke:var(--rule-2);stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round}
+.dg .wl{fill:var(--ink-3);font-size:9px}
+.dg .ax{fill:var(--ink-2);font-size:10px}
+.dg .hi{stroke:var(--accent)}
+.dg .hif{fill:var(--accent)}
+
+/* ---------- footer ---------- */
+footer{padding:52px 0 76px;color:var(--ink-2);font-size:14.5px}
+.fl{display:grid;grid-template-columns:repeat(1,1fr);gap:1px;background:var(--rule);
+  border:1px solid var(--rule);border-radius:4px;overflow:hidden;margin-top:22px}
+@media(min-width:640px){.fl{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:960px){.fl{grid-template-columns:repeat(3,1fr)}}
+.fl a{display:block;background:var(--surface);padding:14px 16px;text-decoration:none;color:var(--ink);min-width:0}
+.fl .fn{overflow-wrap:anywhere}
+.fl a:hover{background:var(--surface-2)}
+.fl .fn{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:600;color:var(--accent-ink)}
+.fl .fd{font-size:12.5px;color:var(--ink-3);margin-top:3px;line-height:1.4}
+
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+<header class="hero">
+  <div class="eyebrow">ChampionCHIP eXperience · Group 31 · Stage 2</div>
+  <h1>Anatomy of a Multicycle RISC-V</h1>
+  <p class="deck">Five people wrote the parts. This is the machine they add up to —
+  <strong>every block, every wire, and why</strong>. Built on ChipInventor, verified against the
+  official firmware, headed for 130&nbsp;nm silicon.</p>
+  <dl class="specs">
+    <div class="spec"><dt>ISA</dt><dd>RV32I + Zmmul + Xicrc</dd></div>
+    <div class="spec"><dt>Microarch</dt><dd>multicycle · 4 states</dd></div>
+    <div class="spec"><dt>Cycles / instr</dt><dd>4</dd></div>
+    <div class="spec"><dt>Sim clock</dt><dd>10 ns · 100 MHz</dd></div>
+    <div class="spec"><dt>Memory</dt><dd>4 KB ROM · 8 KB SRAM</dd></div>
+    <div class="spec"><dt>PDK</dt><dd>Sky130 · ASIC</dd></div>
+    <div class="spec"><dt>Firmware</dt><dd class="ok">PASS · x4 = 0</dd></div>
+    <div class="spec"><dt>OpenLane</dt><dd class="ok">Run #7 (9 Sep) PASS · GDSII, DRC/LVS clean</dd></div>
+  </dl>
+</header>
+
+<nav class="toc" aria-label="Sections">
+  <a href="#cast"><span class="n">01</span>The cast</a>
+  <a href="#beats"><span class="n">02</span>Four beats</a>
+  <a href="#instr"><span class="n">03</span>Inside an instruction</a>
+  <a href="#datapath"><span class="n">04</span>The datapath</a>
+  <a href="#memory"><span class="n">05</span>The memory map</a>
+  <a href="#bug"><span class="n">06</span>The critical bug</a>
+  <a href="#waves"><span class="n">07</span>Reading waveforms</a>
+  <a href="#silicon"><span class="n">08</span>To silicon</a>
+</nav>
+
+<main>
+<section id="cast">
+  <div class="sec-head"><span class="sec-num">01</span><h2>The cast, as a kitchen</h2></div>
+  <p class="sub">One analogy carries the whole design. A CPU is a single cook working through a
+  recipe book, one line at a time, with a fixed set of tools on the counter. Every block on your
+  canvas is one role in that kitchen.</p>
+
+  <ul class="cast">
+    <li><span class="kit"><span class="ico">📕</span>The recipe book on the wall</span>
+        <span class="blk">IMEM_FIRMWARE</span>
+        <span class="job">Read-only. Holds the program — and an appendix of constants at the back.</span></li>
+    <li><span class="kit"><span class="ico">☝️</span>Your finger on the line</span>
+        <span class="blk">PC_Unit</span>
+        <span class="job">Remembers which line you're on. Moves once per dish, not once per beat.</span></li>
+    <li><span class="kit"><span class="ico">➕</span>Sliding down one line</span>
+        <span class="blk">PC_Unit</span>
+        <span class="job">Instructions are 4 bytes, so "next" is always address + 4.</span></li>
+    <li><span class="kit"><span class="ico">📝</span>The sticky note</span>
+        <span class="blk">Datapath_Mux</span>
+        <span class="job">You copy the line down, because your finger is about to point elsewhere.</span></li>
+    <li><span class="kit"><span class="ico">✂️</span>Highlighting the sentence</span>
+        <span class="blk">Datapath_Mux</span>
+        <span class="job">Pulls out verb, ingredient A, ingredient B, output bowl.</span></li>
+    <li><span class="kit"><span class="ico">👨‍💼</span>The manager</span>
+        <span class="blk">Control_Unit</span>
+        <span class="job">Reads the order and shouts 14 commands per beat. The only real brain here.</span></li>
+    <li><span class="kit"><span class="ico">🥣</span>32 labelled prep bowls</span>
+        <span class="blk">Register_File</span>
+        <span class="job">x0–x31. Bowl 0 has a hole in it — always empty, by design.</span></li>
+    <li><span class="kit"><span class="ico">🔪</span>The chopping station</span>
+        <span class="blk">alu</span>
+        <span class="job">Add, subtract, AND, OR, shift, compare. Everyone borrows it.</span></li>
+    <li><span class="kit"><span class="ico">🌀</span>The heavy blender</span>
+        <span class="blk">MULT_Unit</span>
+        <span class="job">Specialist. Too expensive to fold into the chopping station.</span></li>
+    <li><span class="kit"><span class="ico">🏷️</span>The checksum stamper</span>
+        <span class="blk">CRC16_Unit</span>
+        <span class="job">Your team's custom instruction. A data fingerprint in one cycle.</span></li>
+    <li><span class="kit"><span class="ico">🔢</span>The number in the recipe</span>
+        <span class="blk">IMM_GENERATOR</span>
+        <span class="job">Digs the constant out of the instruction and sign-extends it.</span></li>
+    <li><span class="kit"><span class="ico">⚖️</span>The taster</span>
+        <span class="blk">BRANCH_COMPARATOR</span>
+        <span class="job">Answers one yes/no: are these two bowls equal? less? greater?</span></li>
+    <li><span class="kit"><span class="ico">📦</span>The packer at the fridge door</span>
+        <span class="blk">LSU</span>
+        <span class="job">Whole box, half box, or a single item — and unwraps them coming back.</span></li>
+    <li><span class="kit"><span class="ico">🧭</span>The receptionist</span>
+        <span class="blk">Address_Decoder</span>
+        <span class="job">Book or fridge? Routes every request and merges every answer.</span></li>
+    <li><span class="kit"><span class="ico">🧊</span>The walk-in fridge</span>
+        <span class="blk">DMEM</span>
+        <span class="job">8 KB, read/write. One beat slower than everything else.</span></li>
+    <li><span class="kit"><span class="ico">🥁</span>The metronome</span>
+        <span class="blk">clk_i</span>
+        <span class="job">Nothing is committed between beats. Only the rising edge counts.</span></li>
+  </ul>
+
+  <div class="eli5"><b>The one-line version</b>
+  <p>A CPU is a machine that repeats one loop forever: <em>look up the next instruction → work
+  out what it means → do it → write the answer down → repeat</em>. Everything below is detail
+  hanging off that sentence.</p></div>
+</section>
+
+<section id="beats">
+  <div class="sec-head"><span class="sec-num">02</span><h2>Four beats to an instruction</h2></div>
+  <p class="sub">Your CPU is <em>multicycle</em>: every instruction is broken into four short clock
+  ticks instead of one long one. The Control Unit remembers which tick it's on and broadcasts it
+  as <code>state_o</code> — the signal you can watch counting 0, 1, 2, 3 in every waveform.</p>
+
+  <figure>
+    <div class="fig-body">
+      <svg class="dg" viewBox="0 0 900 260" role="img" aria-label="The four-state cycle: FETCH, DECODE, EXECUTE, WRITEBACK, looping back to FETCH, with the control pulse each state asserts.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,1 L9,5 L0,9 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g color="var(--rule-2)">
+          <line x1="196" y1="86" x2="228" y2="86" stroke="currentColor" stroke-width="1.6" marker-end="url(#ah)"/>
+          <line x1="396" y1="86" x2="428" y2="86" stroke="currentColor" stroke-width="1.6" marker-end="url(#ah)"/>
+          <line x1="596" y1="86" x2="628" y2="86" stroke="currentColor" stroke-width="1.6" marker-end="url(#ah)"/>
+          <path d="M796,110 V158 H100 V110" fill="none" stroke="currentColor" stroke-width="1.6" marker-end="url(#ah)"/>
+        </g>
+        <text class="wl" x="448" y="152" text-anchor="middle" fill="var(--ink-3)">next instruction · 40 ns later</text>
+
+        <g>
+          <rect x="24" y="46" width="172" height="64" rx="3" class="bx"/>
+          <text class="bx-t" x="110" y="72" text-anchor="middle" fill="var(--ink)">0 · FETCH</text>
+          <text class="bx-s" x="110" y="90" text-anchor="middle" fill="var(--ink-3)">PC → memory → IR</text>
+          <rect x="224" y="46" width="172" height="64" rx="3" class="bx"/>
+          <text class="bx-t" x="310" y="72" text-anchor="middle" fill="var(--ink)">1 · DECODE</text>
+          <text class="bx-s" x="310" y="90" text-anchor="middle" fill="var(--ink-3)">read registers, build imm</text>
+          <rect x="424" y="46" width="172" height="64" rx="3" class="bx"/>
+          <text class="bx-t" x="510" y="72" text-anchor="middle" fill="var(--ink)">2 · EXECUTE</text>
+          <text class="bx-s" x="510" y="90" text-anchor="middle" fill="var(--ink-3)">ALU works · memory access</text>
+          <rect x="624" y="46" width="172" height="64" rx="3" class="bx"/>
+          <text class="bx-t" x="710" y="72" text-anchor="middle" fill="var(--ink)">3 · WRITEBACK</text>
+          <text class="bx-s" x="710" y="90" text-anchor="middle" fill="var(--ink-3)">answer → register · PC += 4</text>
+        </g>
+
+        <g>
+          <rect x="24" y="14" width="172" height="20" rx="2" fill="var(--accent-soft)"/>
+          <text x="110" y="28" text-anchor="middle" font-size="10.5" fill="var(--accent-ink)">ir_write = 1</text>
+          <rect x="224" y="14" width="172" height="20" rx="2" fill="var(--surface-3)"/>
+          <text x="310" y="28" text-anchor="middle" font-size="10.5" fill="var(--ink-3)">no pulse — pure logic</text>
+          <rect x="424" y="14" width="172" height="20" rx="2" fill="var(--accent-soft)"/>
+          <text x="510" y="28" text-anchor="middle" font-size="10.5" fill="var(--accent-ink)">mem_oe / mem_we</text>
+          <rect x="624" y="14" width="172" height="20" rx="2" fill="var(--accent-soft)"/>
+          <text x="710" y="28" text-anchor="middle" font-size="10.5" fill="var(--accent-ink)">rd_we = 1 · pc_write = 1</text>
+        </g>
+
+        <g>
+          <text class="ax" x="24" y="200" fill="var(--ink-2)">10 ns per beat · 40 ns per instruction · the PC advances exactly once, on beat 3</text>
+          <text class="ax" x="24" y="220" fill="var(--ink-3)">Beat 1 is the only one that touches the instruction ROM. Beat 3 is the only one that touches data memory.</text>
+          <text class="ax" x="24" y="240" fill="var(--ink-3)">That separation is what lets the whole CPU share a single address bus.</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption><span class="fno">Fig. 1</span>The FSM. Each state asserts a different control pulse; DECODE asserts none, because register reads and immediate generation are combinational and need no clock.</figcaption>
+  </figure>
+
+  <div class="prose">
+    <p>Why not do it all in one beat? You could — that's a <em>single-cycle</em> CPU. But then the
+    clock has to be slow enough for the worst instruction, and you need two separate memory ports
+    because fetching and loading would happen in the same instant. Multicycle trades cycles for
+    area, which is exactly the right trade for a student ASIC.</p>
+  </div>
+
+  <div class="eli5"><b>ELI5</b>
+  <p>It's a 4/4 drum beat. <em>Look-it-up, understand-it, do-it, write-it-down.</em> Then again.
+  Forever. In a waveform you literally see <code>state_o</code> counting 0,1,2,3 and
+  <code>pc_o</code> stepping once per group of four.</p></div>
+
+  <div class="eli5 warn"><b>Gotcha · reset polarity</b>
+  <p>The Control Unit wants reset <em>high</em> to mean "stop". Everything else wants it
+  <em>low</em>. That's the entire job of the lone <code>inverterC</code> block on your canvas —
+  a translator between two people who agreed to signal "stop" in opposite directions.</p></div>
+</section>
+<section id="instr">
+  <div class="sec-head"><span class="sec-num">03</span><h2>Inside a 32-bit instruction</h2></div>
+  <p class="sub">Every RISC-V instruction is exactly 32 bits — which is why the PC steps by 4 bytes.
+  Think of it as a sentence where each word sits at a fixed position. Five different layouts reuse
+  the same positions in different ways.</p>
+
+  <figure>
+    <div class="fig-body">
+      <svg class="dg" viewBox="0 0 940 340" role="img" aria-label="The RISC-V 32-bit instruction word split into funct7, rs2, rs1, funct3, rd and opcode fields, followed by how the R, I, S, B, U and J formats reallocate those bits to hold an immediate.">
+        <g font-size="9" fill="var(--ink-3)">
+          <text x="20" y="16">31</text><text x="243" y="16">25</text><text x="268" y="16">24</text>
+          <text x="380" y="16">20</text><text x="405" y="16">19</text><text x="517" y="16">15</text>
+          <text x="542" y="16">14</text><text x="613" y="16">12</text><text x="638" y="16">11</text>
+          <text x="750" y="16">7</text><text x="775" y="16">6</text><text x="892" y="16">0</text>
+        </g>
+
+        <g>
+          <rect x="20" y="24" width="240" height="42" rx="2" fill="var(--surface-3)" stroke="var(--rule-2)"/>
+          <text x="140" y="43" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">funct7</text>
+          <text x="140" y="58" text-anchor="middle" font-size="9" fill="var(--ink-3)">which variant</text>
+          <rect x="262" y="24" width="126" height="42" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/>
+          <text x="325" y="43" text-anchor="middle" font-size="12" font-weight="600" fill="var(--accent-ink)">rs2</text>
+          <text x="325" y="58" text-anchor="middle" font-size="9" fill="var(--ink-3)">bowl B</text>
+          <rect x="390" y="24" width="126" height="42" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/>
+          <text x="453" y="43" text-anchor="middle" font-size="12" font-weight="600" fill="var(--accent-ink)">rs1</text>
+          <text x="453" y="58" text-anchor="middle" font-size="9" fill="var(--ink-3)">bowl A</text>
+          <rect x="518" y="24" width="96" height="42" rx="2" fill="var(--surface-3)" stroke="var(--rule-2)"/>
+          <text x="566" y="43" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">funct3</text>
+          <text x="566" y="58" text-anchor="middle" font-size="9" fill="var(--ink-3)">sub-type</text>
+          <rect x="616" y="24" width="126" height="42" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/>
+          <text x="679" y="43" text-anchor="middle" font-size="12" font-weight="600" fill="var(--accent-ink)">rd</text>
+          <text x="679" y="58" text-anchor="middle" font-size="9" fill="var(--ink-3)">output bowl</text>
+          <rect x="744" y="24" width="152" height="42" rx="2" fill="var(--signal-soft)" stroke="var(--rule-2)"/>
+          <text x="820" y="43" text-anchor="middle" font-size="12" font-weight="600" fill="var(--signal)">opcode</text>
+          <text x="820" y="58" text-anchor="middle" font-size="9" fill="var(--ink-3)">the family</text>
+        </g>
+
+        <line x1="20" y1="84" x2="896" y2="84" stroke="var(--rule)" stroke-width="1"/>
+        <text x="20" y="102" font-size="10" letter-spacing="1.2" fill="var(--ink-3)">THE FIVE LAYOUTS — grey bits become the immediate</text>
+
+        <g font-size="10">
+          <text x="20" y="130" font-size="11" font-weight="600" fill="var(--ink)">R</text>
+          <text x="42" y="130" font-size="9.5" fill="var(--ink-3)">add sub mul crcb</text>
+          <rect x="160" y="119" width="240" height="15" rx="2" fill="var(--surface-3)" stroke="var(--rule-2)"/><text x="280" y="130" text-anchor="middle" fill="var(--ink-2)">funct7</text>
+          <rect x="402" y="119" width="126" height="15" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/><text x="465" y="130" text-anchor="middle" fill="var(--accent-ink)">rs2</text>
+          <rect x="530" y="119" width="126" height="15" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/><text x="593" y="130" text-anchor="middle" fill="var(--accent-ink)">rs1</text>
+          <rect x="658" y="119" width="52" height="15" rx="2" fill="var(--surface-3)" stroke="var(--rule-2)"/><text x="684" y="130" text-anchor="middle" font-size="8.5" fill="var(--ink-2)">f3</text>
+          <rect x="712" y="119" width="80" height="15" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/><text x="752" y="130" text-anchor="middle" fill="var(--accent-ink)">rd</text>
+          <rect x="794" y="119" width="102" height="15" rx="2" fill="var(--signal-soft)" stroke="var(--rule-2)"/><text x="845" y="130" text-anchor="middle" font-size="9" fill="var(--signal)">opcode</text>
+
+          <text x="20" y="158" font-size="11" font-weight="600" fill="var(--ink)">I</text>
+          <text x="42" y="158" font-size="9.5" fill="var(--ink-3)">addi lw jalr</text>
+          <rect x="160" y="147" width="368" height="15" rx="2" fill="var(--alert-soft)" stroke="var(--rule-2)"/><text x="344" y="158" text-anchor="middle" fill="var(--alert)">imm[11:0] — signed</text>
+          <rect x="530" y="147" width="126" height="15" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/><text x="593" y="158" text-anchor="middle" fill="var(--accent-ink)">rs1</text>
+          <rect x="658" y="147" width="52" height="15" rx="2" fill="var(--surface-3)" stroke="var(--rule-2)"/><text x="684" y="158" text-anchor="middle" font-size="8.5" fill="var(--ink-2)">f3</text>
+          <rect x="712" y="147" width="80" height="15" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/><text x="752" y="158" text-anchor="middle" fill="var(--accent-ink)">rd</text>
+          <rect x="794" y="147" width="102" height="15" rx="2" fill="var(--signal-soft)" stroke="var(--rule-2)"/><text x="845" y="158" text-anchor="middle" font-size="9" fill="var(--signal)">opcode</text>
+
+          <text x="20" y="186" font-size="11" font-weight="600" fill="var(--ink)">S</text>
+          <text x="42" y="186" font-size="9.5" fill="var(--ink-3)">sw sh sb</text>
+          <rect x="160" y="175" width="240" height="15" rx="2" fill="var(--alert-soft)" stroke="var(--rule-2)"/><text x="280" y="186" text-anchor="middle" fill="var(--alert)">imm[11:5]</text>
+          <rect x="402" y="175" width="126" height="15" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/><text x="465" y="186" text-anchor="middle" fill="var(--accent-ink)">rs2</text>
+          <rect x="530" y="175" width="126" height="15" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/><text x="593" y="186" text-anchor="middle" fill="var(--accent-ink)">rs1</text>
+          <rect x="658" y="175" width="52" height="15" rx="2" fill="var(--surface-3)" stroke="var(--rule-2)"/><text x="684" y="186" text-anchor="middle" font-size="8.5" fill="var(--ink-2)">f3</text>
+          <rect x="712" y="175" width="80" height="15" rx="2" fill="var(--alert-soft)" stroke="var(--rule-2)"/><text x="752" y="186" text-anchor="middle" font-size="9" fill="var(--alert)">imm[4:0]</text>
+          <rect x="794" y="175" width="102" height="15" rx="2" fill="var(--signal-soft)" stroke="var(--rule-2)"/><text x="845" y="186" text-anchor="middle" font-size="9" fill="var(--signal)">opcode</text>
+
+          <text x="20" y="214" font-size="11" font-weight="600" fill="var(--ink)">B</text>
+          <text x="42" y="214" font-size="9.5" fill="var(--ink-3)">beq bne blt</text>
+          <rect x="160" y="203" width="240" height="15" rx="2" fill="var(--alert-soft)" stroke="var(--rule-2)"/><text x="280" y="214" text-anchor="middle" fill="var(--alert)">imm[12|10:5] — shuffled</text>
+          <rect x="402" y="203" width="126" height="15" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/><text x="465" y="214" text-anchor="middle" fill="var(--accent-ink)">rs2</text>
+          <rect x="530" y="203" width="126" height="15" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/><text x="593" y="214" text-anchor="middle" fill="var(--accent-ink)">rs1</text>
+          <rect x="658" y="203" width="52" height="15" rx="2" fill="var(--surface-3)" stroke="var(--rule-2)"/><text x="684" y="214" text-anchor="middle" font-size="8.5" fill="var(--ink-2)">f3</text>
+          <rect x="712" y="203" width="80" height="15" rx="2" fill="var(--alert-soft)" stroke="var(--rule-2)"/><text x="752" y="214" text-anchor="middle" font-size="8.5" fill="var(--alert)">imm[4:1|11]</text>
+          <rect x="794" y="203" width="102" height="15" rx="2" fill="var(--signal-soft)" stroke="var(--rule-2)"/><text x="845" y="214" text-anchor="middle" font-size="9" fill="var(--signal)">opcode</text>
+
+          <text x="20" y="242" font-size="11" font-weight="600" fill="var(--ink)">U</text>
+          <text x="42" y="242" font-size="9.5" fill="var(--ink-3)">lui auipc</text>
+          <rect x="160" y="231" width="552" height="15" rx="2" fill="var(--alert-soft)" stroke="var(--rule-2)"/><text x="436" y="242" text-anchor="middle" fill="var(--alert)">imm[31:12] — the top 20 bits ARE the number</text>
+          <rect x="712" y="231" width="80" height="15" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/><text x="752" y="242" text-anchor="middle" fill="var(--accent-ink)">rd</text>
+          <rect x="794" y="231" width="102" height="15" rx="2" fill="var(--signal-soft)" stroke="var(--rule-2)"/><text x="845" y="242" text-anchor="middle" font-size="9" fill="var(--signal)">opcode</text>
+
+          <text x="20" y="270" font-size="11" font-weight="600" fill="var(--ink)">J</text>
+          <text x="42" y="270" font-size="9.5" fill="var(--ink-3)">jal</text>
+          <rect x="160" y="259" width="552" height="15" rx="2" fill="var(--alert-soft)" stroke="var(--rule-2)"/><text x="436" y="270" text-anchor="middle" fill="var(--alert)">imm[20|10:1|11|19:12] — heavily shuffled</text>
+          <rect x="712" y="259" width="80" height="15" rx="2" fill="var(--accent-soft)" stroke="var(--rule-2)"/><text x="752" y="270" text-anchor="middle" fill="var(--accent-ink)">rd</text>
+          <rect x="794" y="259" width="102" height="15" rx="2" fill="var(--signal-soft)" stroke="var(--rule-2)"/><text x="845" y="270" text-anchor="middle" font-size="9" fill="var(--signal)">opcode</text>
+        </g>
+
+        <line x1="20" y1="292" x2="896" y2="292" stroke="var(--rule)"/>
+        <text x="20" y="312" font-size="10.5" fill="var(--ink-2)">Because the immediate moves and scrambles per format, it needs a decoder and an unscrambler:</text>
+        <text x="20" y="330" font-size="10.5" fill="var(--ink-3)">IMM_GENERATOR reads the opcode itself (JAL/BRANCH/STORE/LUI/AUIPC, else I-type) → one 32-bit sign-extended number</text>
+      </svg>
+    </div>
+    <figcaption><span class="fno">Fig. 2</span>The same 32 bits, read six ways. Green fields name registers, amber is the opcode, red is immediate data. Notice that <code>rs1</code>, <code>funct3</code> and <code>opcode</code> never move — that's what lets the register file and splitter start work before anyone knows the instruction's format.</figcaption>
+  </figure>
+
+  <div class="prose">
+    <p>Decode one by hand. <code>0x00A00293</code> — <code>addi x5, x0, 10</code> —
+    breaks into <code>imm=0x00A</code>, <code>rs1=0</code>, <code>funct3=000</code>,
+    <code>rd=5</code>, <code>opcode=0010011</code>. That reads as
+    <strong><code>addi x5, x0, 10</code></strong>: bowl 5 gets bowl 0 (always zero) plus 10.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      
+      <thead><tr><th>Where MUL and CRC hide</th><th class="m">opcode</th><th class="m">funct7</th><th>Routed to</th><th class="m">wb_sel</th></tr></thead>
+      <tbody>
+        <tr><td>Ordinary maths — <code>add</code>, <code>and</code>, <code>or</code></td><td class="m">0110011</td><td class="m">0000000</td><td>ALU</td><td class="m">0</td></tr>
+        <tr><td>Alternate variants — <code>sub</code>, <code>sra</code></td><td class="m">0110011</td><td class="m">0100000</td><td>ALU</td><td class="m">0</td></tr>
+        <tr><td><span class="tag a">Zmmul</span> <code>mul</code>, <code>mulh</code>…</td><td class="m">0110011</td><td class="m">0000001</td><td>multiplier</td><td class="m">2</td></tr>
+        <tr><td><span class="tag a">Xicrc</span> <code>crcb</code>, <code>crch</code>, <code>crcw</code></td><td class="m">0110011</td><td class="m">1000000</td><td>crc</td><td class="m">3</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="eli5 warn"><b>The Stage-5 bug lived right here</b>
+  <p>You first hand-encoded <code>crcb</code> with <code>funct7 = 0100000</code> — but that pattern
+  is already taken; it means SUB/SRA. The Control Unit correctly saw a subtract, and
+  <code>wb_sel_o</code> never reached 3. The right encoding is <code>1000000</code>. A custom
+  extension has to claim an <em>unused</em> encoding, and the test failing proved the decoder was
+  rejecting malformed CRC properly.</p></div>
+</section>
+<style>
+.dp-shell{margin-top:34px;border:1px solid var(--rule);border-radius:4px;background:var(--surface);
+  box-shadow:var(--shadow);overflow:hidden}
+.dp-bar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;padding:14px 18px;
+  border-bottom:1px solid var(--rule);background:var(--surface-2)}
+.dp-grp{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dp-lbl{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3)}
+.chip{font-family:"IBM Plex Mono",monospace;font-size:12.5px;padding:4px 10px;border-radius:3px;
+  border:1px solid var(--rule-2);background:var(--surface);color:var(--ink-2);cursor:pointer;
+  transition:background .12s,color .12s,border-color .12s}
+.chip:hover{border-color:var(--accent);color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--ground);font-weight:600}
+.dp-canvas{padding:18px;overflow-x:auto}
+.dp-canvas svg{display:block;min-width:1060px;width:100%;height:auto}
+.scrollhint{display:none;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3);
+  padding:0 18px 12px}
+@media(max-width:1180px){.scrollhint{display:block}}
+.dp-read{display:grid;grid-template-columns:1fr;gap:0;border-top:1px solid var(--rule)}
+@media(min-width:860px){.dp-read{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr)}}
+.dp-note{padding:16px 18px}
+.dp-note .beat{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:7px}
+.dp-note .asm{font-family:"IBM Plex Mono",monospace;font-size:14px;color:var(--ink);margin-bottom:9px}
+.dp-note p{margin:0;font-size:14.5px;line-height:1.55;color:var(--ink-2)}
+.dp-sig{padding:16px 18px;border-top:1px solid var(--rule);background:var(--surface-2)}
+@media(min-width:860px){.dp-sig{border-top:0;border-left:1px solid var(--rule)}}
+.dp-sig .dp-lbl{margin-bottom:9px;display:block}
+.sigrow{display:flex;justify-content:space-between;gap:14px;font-family:"IBM Plex Mono",monospace;
+  font-size:12.5px;padding:3px 0;border-bottom:1px dotted var(--rule)}
+.sigrow:last-child{border-bottom:0}
+.sigrow .k{color:var(--ink-3)}
+.sigrow .v{color:var(--accent-ink);font-weight:600;font-variant-numeric:tabular-nums}
+.sigrow .v.off{color:var(--ink-3);font-weight:400}
+
+.dg .blk rect{fill:var(--surface-2);stroke:var(--rule-2);stroke-width:1.2;transition:fill .18s,stroke .18s}
+.dg .blk .bx-t{fill:var(--ink);font-size:11.5px;font-weight:600;transition:fill .18s}
+.dg .blk .bx-s{fill:var(--ink-3);font-size:8.5px}
+.dg .blk.on rect{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.8}
+.dg .blk.on .bx-t{fill:var(--accent-ink)}
+.dg .wire{fill:none;stroke:var(--rule);color:var(--rule);stroke-width:1.3;
+  stroke-linejoin:round;stroke-linecap:round;transition:stroke .18s,color .18s,stroke-width .18s}
+.dg .wire.on{stroke:var(--accent);color:var(--accent);stroke-width:2.1}
+.dg .wire.star{stroke:var(--signal);color:var(--signal);stroke-width:1.8;stroke-dasharray:6 3}
+.dg .wire.star.on{stroke:var(--signal);color:var(--signal);stroke-width:2.6;stroke-dasharray:none}
+.dg .ctl{stroke:var(--rule);stroke-width:1;stroke-dasharray:3 3;fill:none}
+</style>
+
+<section id="datapath">
+  <div class="sec-head"><span class="sec-num">04</span><h2>The datapath, one beat at a time</h2></div>
+  <p class="sub">This is the whole machine. Pick an instruction, then walk it through the four
+  beats — the blocks and wires that are actually carrying that instruction light up. Everything
+  greyed out is still powered and still computing; it's just not being listened to.</p>
+
+  <div class="dp-shell">
+    <div class="dp-bar">
+      <div class="dp-grp">
+        <span class="dp-lbl">Instruction</span>
+        <button class="chip" data-ins="addi" aria-pressed="true">addi</button>
+        <button class="chip" data-ins="add" aria-pressed="false">add</button>
+        <button class="chip" data-ins="lw" aria-pressed="false">lw</button>
+        <button class="chip" data-ins="sw" aria-pressed="false">sw</button>
+        <button class="chip" data-ins="beq" aria-pressed="false">beq</button>
+        <button class="chip" data-ins="jal" aria-pressed="false">jal</button>
+        <button class="chip" data-ins="mul" aria-pressed="false">mul</button>
+        <button class="chip" data-ins="crcb" aria-pressed="false">crcb</button>
+      </div>
+      <div class="dp-grp">
+        <span class="dp-lbl">Beat</span>
+        <button class="chip" data-beat="0" aria-pressed="true">0 fetch</button>
+        <button class="chip" data-beat="1" aria-pressed="false">1 decode</button>
+        <button class="chip" data-beat="2" aria-pressed="false">2 execute</button>
+        <button class="chip" data-beat="3" aria-pressed="false">3 writeback</button>
+      </div>
+    </div>
+
+    <div class="dp-canvas">
+      <svg class="dg" id="dp" viewBox="0 0 1260 700" role="img" aria-label="Full datapath of the multicycle RISC-V core: program counter and adder feeding an address mux into the address decoder, which fans to instruction and data memory; the instruction register feeds the splitter, immediate generator and control unit; the register file feeds the ALU input muxes, branch comparator, multiplier, CRC unit and load-store unit; all result sources converge on the writeback mux and return to the register file.">
+        <defs>
+          <marker id="a2" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,1.5 L8.5,5 L0,8.5 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <!-- control unit band -->
+        <g id="b-cu" class="blk">
+          <rect x="40" y="22" width="1180" height="38" rx="3"/>
+          <text class="bx-t" x="630" y="40" text-anchor="middle">Control_Unit — 4-state FSM + instruction decode</text>
+          <text class="bx-s" x="630" y="53" text-anchor="middle">drives ir_write · pc_write · pc_src · alu_op · alu_src_a/b · mul_op · crc_op · wb_sel · rd_we · mem_we · mem_oe · addr_src</text>
+        </g>
+
+        <!-- wires: PC loop -->
+        <path id="w-pc-add4"    class="wire" d="M82,246 V288" marker-end="url(#a2)"/>
+        <path id="w-add4-pcmux" class="wire" d="M124,311 H150 V139 H127" marker-end="url(#a2)"/>
+        <path id="w-pcmux-pc"   class="wire" d="M82,118 V96 H26 V223 H37" marker-end="url(#a2)"/>
+        <path id="w-pc-amux"    class="wire" d="M124,223 H173" marker-end="url(#a2)"/>
+        <path id="w-pc-muxa"    class="wire" d="M124,206 H158 V84 H918 V149" marker-end="url(#a2)"/>
+        <path id="w-alu-pcmux"  class="wire" d="M1040,150 V72 H14 V139 H37" marker-end="url(#a2)"/>
+
+        <!-- wires: memory side -->
+        <path id="w-amux-dec"  class="wire" d="M252,223 H297" marker-end="url(#a2)"/>
+        <path id="w-dec-imem"  class="wire" d="M340,196 V173" marker-end="url(#a2)"/>
+        <path id="w-imem-dec"  class="wire" d="M382,170 V193" marker-end="url(#a2)"/>
+        <path id="w-dec-dmem"  class="wire" d="M340,256 V293" marker-end="url(#a2)"/>
+        <path id="w-dmem-dec"  class="wire" d="M382,296 V259" marker-end="url(#a2)"/>
+        <path id="w-dec-ir"    class="wire" d="M422,212 H467" marker-end="url(#a2)"/>
+        <path id="w-dec-lsu"   class="wire star" d="M422,240 H446 V492 H1020 V413" marker-end="url(#a2)"/>
+
+        <!-- wires: decode -->
+        <path id="w-ir-cu"   class="wire" d="M470,205 H452 V63" marker-end="url(#a2)"/>
+        <path id="w-ir-spl"  class="wire" d="M554,208 H570 V152 H593" marker-end="url(#a2)"/>
+        <path id="w-ir-imm"  class="wire" d="M554,230 H578 V257 H593" marker-end="url(#a2)"/>
+        <path id="w-spl-rf"  class="wire" d="M692,160 H714 V190 H733" marker-end="url(#a2)"/>
+        <path id="w-spl-bc"  class="wire" d="M692,168 H726 V360 H881" marker-end="url(#a2)"/>
+        <path id="w-spl-lsu" class="wire" d="M692,140 H712 V524 H1044 V413" marker-end="url(#a2)"/>
+        <path id="w-imm-muxb" class="wire" d="M692,266 H918 V251" marker-end="url(#a2)"/>
+
+        <!-- wires: register file fan-out -->
+        <path id="w-rf-muxa" class="wire" d="M844,186 H852 V171 H881" marker-end="url(#a2)"/>
+        <path id="w-rf-muxb" class="wire" d="M844,206 H860 V233 H881" marker-end="url(#a2)"/>
+        <g id="w-rf-fan" class="wire">
+          <path d="M844,240 H868 V400" fill="none" stroke="inherit"/>
+          <path d="M868,265 H993" fill="none" stroke="inherit" marker-end="url(#a2)"/>
+          <path d="M868,319 H993" fill="none" stroke="inherit" marker-end="url(#a2)"/>
+          <path d="M868,360 H881" fill="none" stroke="inherit" marker-end="url(#a2)"/>
+          <path d="M868,400 H993" fill="none" stroke="inherit" marker-end="url(#a2)"/>
+        </g>
+
+        <!-- wires: execute -->
+        <path id="w-muxa-alu" class="wire" d="M952,171 H972 V176 H993" marker-end="url(#a2)"/>
+        <path id="w-muxb-alu" class="wire" d="M952,233 H972 V206 H993" marker-end="url(#a2)"/>
+        <path id="w-bc-cu"    class="wire" d="M980,352 H988 V63" marker-end="url(#a2)"/>
+        <path id="w-alu-lsu"  class="wire" d="M1084,204 H1112 V375 H1087" marker-end="url(#a2)"/>
+        <path id="w-alu-amux" class="wire" d="M1084,226 H1104 V620 H214 V249" marker-end="url(#a2)"/>
+        <g id="w-lsu-mem" class="wire">
+          <path d="M996,392 H976 V560 H361 V351" fill="none" stroke="inherit" marker-end="url(#a2)"/>
+          <path d="M440,560 V276 H416 V259" fill="none" stroke="inherit" marker-end="url(#a2)"/>
+        </g>
+
+        <!-- wires: writeback -->
+        <path id="w-alu-wb"  class="wire" d="M1084,188 H1145" marker-end="url(#a2)"/>
+        <path id="w-mul-wb"  class="wire" d="M1084,265 H1145" marker-end="url(#a2)"/>
+        <path id="w-crc-wb"  class="wire" d="M1084,319 H1145" marker-end="url(#a2)"/>
+        <path id="w-lsu-wb"  class="wire" d="M1084,383 H1145" marker-end="url(#a2)"/>
+        <path id="w-add4-wb" class="wire" d="M82,330 V660 H1136 V410 H1145" marker-end="url(#a2)"/>
+        <path id="w-wb-rf"   class="wire" d="M1220,300 H1244 V686 H790 V263" marker-end="url(#a2)"/>
+
+        <!-- blocks -->
+        <g id="b-pcmux" class="blk"><rect x="40" y="118" width="84" height="42" rx="3"/>
+          <text class="bx-t" x="82" y="136" text-anchor="middle">PC mux</text>
+          <text class="bx-s" x="82" y="150" text-anchor="middle">+4 / ALU / JALR</text></g>
+        <g id="b-pc" class="blk"><rect x="40" y="200" width="84" height="46" rx="3"/>
+          <text class="bx-t" x="82" y="220" text-anchor="middle">PC</text>
+          <text class="bx-s" x="82" y="234" text-anchor="middle">0x00400000</text></g>
+        <g id="b-add4" class="blk"><rect x="40" y="292" width="84" height="38" rx="3"/>
+          <text class="bx-t" x="82" y="316" text-anchor="middle">+4</text></g>
+        <g id="b-amux" class="blk"><rect x="176" y="200" width="76" height="46" rx="3"/>
+          <text class="bx-t" x="214" y="220" text-anchor="middle">addr mux</text>
+          <text class="bx-s" x="214" y="234" text-anchor="middle">fetch / data</text></g>
+        <g id="b-imem" class="blk"><rect x="300" y="118" width="122" height="52" rx="3"/>
+          <text class="bx-t" x="361" y="139" text-anchor="middle">IMEM · ROM</text>
+          <text class="bx-s" x="361" y="153" text-anchor="middle">0x00400000 · 4 MB</text>
+          <text class="bx-s" x="361" y="164" text-anchor="middle">combinational read</text></g>
+        <g id="b-dec" class="blk"><rect x="300" y="196" width="122" height="60" rx="3"/>
+          <text class="bx-t" x="361" y="219" text-anchor="middle">Address_Decoder</text>
+          <text class="bx-s" x="361" y="233" text-anchor="middle">routes by address range</text>
+          <text class="bx-s" x="361" y="245" text-anchor="middle">merges both read paths</text></g>
+        <g id="b-dmem" class="blk"><rect x="300" y="296" width="122" height="52" rx="3"/>
+          <text class="bx-t" x="361" y="317" text-anchor="middle">DMEM · SRAM</text>
+          <text class="bx-s" x="361" y="331" text-anchor="middle">0x10010000 · 8 KB</text>
+          <text class="bx-s" x="361" y="342" text-anchor="middle">registered read (+1 clk)</text></g>
+        <g id="b-ir" class="blk"><rect x="470" y="196" width="84" height="46" rx="3"/>
+          <text class="bx-t" x="512" y="216" text-anchor="middle">IR</text>
+          <text class="bx-s" x="512" y="230" text-anchor="middle">latched in fetch</text></g>
+        <g id="b-spl" class="blk"><rect x="596" y="130" width="96" height="44" rx="3"/>
+          <text class="bx-t" x="644" y="149" text-anchor="middle">Datapath_Mux</text>
+          <text class="bx-s" x="644" y="163" text-anchor="middle">rs1 rs2 rd op f3</text></g>
+        <g id="b-imm" class="blk"><rect x="596" y="232" width="96" height="50" rx="3"/>
+          <text class="bx-t" x="644" y="252" text-anchor="middle">imm_gen</text>
+          <text class="bx-s" x="644" y="265" text-anchor="middle">IMM_GENERATOR</text>
+          <text class="bx-s" x="644" y="276" text-anchor="middle">sign-extends</text></g>
+        <g id="b-rf" class="blk"><rect x="736" y="168" width="108" height="92" rx="3"/>
+          <text class="bx-t" x="790" y="202" text-anchor="middle">Register file</text>
+          <text class="bx-s" x="790" y="217" text-anchor="middle">x0 – x31</text>
+          <text class="bx-s" x="790" y="230" text-anchor="middle">async read</text>
+          <text class="bx-s" x="790" y="242" text-anchor="middle">sync write</text></g>
+        <g id="b-muxa" class="blk"><rect x="884" y="152" width="68" height="38" rx="3"/>
+          <text class="bx-t" x="918" y="169" text-anchor="middle">A mux</text>
+          <text class="bx-s" x="918" y="182" text-anchor="middle">rs1 / PC</text></g>
+        <g id="b-muxb" class="blk"><rect x="884" y="214" width="68" height="38" rx="3"/>
+          <text class="bx-t" x="918" y="231" text-anchor="middle">B mux</text>
+          <text class="bx-s" x="918" y="244" text-anchor="middle">rs2 / imm</text></g>
+        <g id="b-alu" class="blk"><rect x="996" y="150" width="88" height="76" rx="3"/>
+          <text class="bx-t" x="1040" y="182" text-anchor="middle">ALU</text>
+          <text class="bx-s" x="1040" y="196" text-anchor="middle">result · address</text>
+          <text class="bx-s" x="1040" y="207" text-anchor="middle">branch target</text></g>
+        <g id="b-mul" class="blk"><rect x="996" y="246" width="88" height="38" rx="3"/>
+          <text class="bx-t" x="1040" y="263" text-anchor="middle">multiplier</text>
+          <text class="bx-s" x="1040" y="276" text-anchor="middle">Zmmul</text></g>
+        <g id="b-crc" class="blk"><rect x="996" y="300" width="88" height="38" rx="3"/>
+          <text class="bx-t" x="1040" y="317" text-anchor="middle">crc</text>
+          <text class="bx-s" x="1040" y="330" text-anchor="middle">Xicrc · 0x1021</text></g>
+        <g id="b-lsu" class="blk"><rect x="996" y="356" width="88" height="54" rx="3"/>
+          <text class="bx-t" x="1040" y="376" text-anchor="middle">LSU</text>
+          <text class="bx-s" x="1040" y="389" text-anchor="middle">byte / half / word</text>
+          <text class="bx-s" x="1040" y="400" text-anchor="middle">sign-extend</text></g>
+        <g id="b-bc" class="blk"><rect x="884" y="340" width="96" height="40" rx="3"/>
+          <text class="bx-t" x="932" y="358" text-anchor="middle">branch cmp</text>
+          <text class="bx-s" x="932" y="371" text-anchor="middle">taken?</text></g>
+        <g id="b-wb" class="blk"><rect x="1148" y="170" width="72" height="260" rx="3"/>
+          <text class="bx-t" x="1184" y="294" text-anchor="middle">WB</text>
+          <text class="bx-t" x="1184" y="308" text-anchor="middle">mux</text>
+          <text class="bx-s" x="1184" y="324" text-anchor="middle">5 → 1</text></g>
+
+        <!-- wire labels -->
+        <g class="wl" fill="var(--ink-3)" font-size="8.5">
+          <text x="428" y="208">core_data_o</text>
+          <text x="452" y="486">core_data_o → LSU.mem_data_i</text>
+          <text x="388" y="188" text-anchor="start">instr</text>
+          <text x="388" y="276" text-anchor="start">rdata</text>
+          <text x="700" y="156">rs1 rs2 rd</text>
+          <text x="700" y="262">imm</text>
+          <text x="872" y="256">rs1, rs2</text>
+          <text x="1090" y="184">Q</text>
+          <text x="960" y="616" text-anchor="middle">ALU result → data address</text>
+          <text x="600" y="556" text-anchor="middle">store data + byte-write mask</text>
+          <text x="600" y="656" text-anchor="middle">PC + 4 — the jal / jalr return address</text>
+          <text x="900" y="682" text-anchor="middle">write-back value → rd</text>
+          <text x="130" y="80">PC</text>
+          <text x="1046" y="68">branch / jump target</text>
+        </g>
+        <text class="wl" x="452" y="60" font-size="8.5" fill="var(--ink-3)">instr</text>
+        <text class="wl" x="994" y="60" font-size="8.5" fill="var(--ink-3)">taken?</text>
+      </svg>
+    </div>
+
+    <div class="scrollhint">↔ scroll the diagram sideways to see the full datapath</div>
+
+    <div class="dp-read">
+      <div class="dp-note">
+        <div class="beat" id="dp-beat">Beat 0 · FETCH</div>
+        <div class="asm" id="dp-asm">addi x5, x0, 10 &nbsp;·&nbsp; 0x00A00293</div>
+        <p id="dp-text">Loading…</p>
+      </div>
+      <div class="dp-sig">
+        <span class="dp-lbl">Control signals this beat</span>
+        <div id="dp-sigs"></div>
+      </div>
+    </div>
+  </div>
+  <p class="sub" style="margin-top:14px;font-size:14.5px">
+    <span class="tag s">dashed amber</span> is the one wire that was originally wrong —
+    <code>Address_Decoder.core_data_o → LSU.mem_data_i</code>. Section 06 is the story.
+    Control lines from the Control Unit are omitted for legibility; they reach every mux and enable
+    on the diagram.</p>
+<script>
+(function(){
+  var FB=['b-cu','b-pc','b-amux','b-dec','b-imem','b-ir'];
+  var FW=['w-pc-amux','w-amux-dec','w-dec-imem','w-imem-dec','w-dec-ir','w-ir-cu'];
+  var FS={state:'0 FETCH',addr_src:'0 · PC',ir_write:'1',mem_oe:'1',rd_we:'0',pc_write:'0'};
+  var FT='The address mux points at the PC. That address goes to the decoder, which sees 0x004xxxxx, routes the read to IMEM, and brings the instruction back on core_data_o. ir_write pulses and the IR latches it — the CPU now has the instruction written down.';
+
+  function fetch(extra){return {b:FB,w:FW,s:FS,t:extra||FT};}
+
+  var DB=['b-cu','b-ir','b-spl','b-rf'], DW=['w-ir-spl','w-spl-rf','w-ir-cu'];
+  var DS={state:'1 DECODE',ir_write:'0',rd_we:'0',pc_write:'0',mem_oe:'0'};
+
+  var INS={
+   addi:{asm:'addi x5, x0, 10',hex:'0x00A00293',beats:[
+    fetch(),
+    {b:DB.concat(['b-imm']),w:DW.concat(['w-ir-imm']),s:DS,
+     t:'Datapath_Mux slices out rs1=0, rd=5 and funct3 straight from the instruction register. IMM_GENERATOR sees the opcode is not JAL/BRANCH/STORE/LUI/AUIPC, so it takes the I-type path: bits 31:20, sign-extended to 32-bit 10. The register file reads x0 the instant its address arrives — no clock needed.'},
+    {b:['b-cu','b-rf','b-muxa','b-muxb','b-imm','b-alu'],w:['w-rf-muxa','w-imm-muxb','w-muxa-alu','w-muxb-alu'],
+     s:{state:'2 EXECUTE',alu_src_a:'0 · rs1',alu_src_b:'1 · imm',alu_op:'1 · ADD',rd_we:'0'},
+     t:'A mux picks rs1 (which is x0 = 0), B mux picks the immediate. The ALU adds them. Q = 10. Nothing is stored yet — this beat is pure combinational settling.'},
+    {b:['b-cu','b-alu','b-wb','b-rf','b-pc','b-add4','b-pcmux'],w:['w-alu-wb','w-wb-rf','w-pc-add4','w-add4-pcmux','w-pcmux-pc'],
+     s:{state:'3 WRITEBACK',wb_sel:'0 · ALU',rd_we:'1',pc_src:'0 · PC+4',pc_write:'1'},
+     t:'wb_sel = 0 selects the ALU result. On the rising edge, rd_we writes 10 into x5 and pc_write advances the PC to 0x00400004. One dish done; the finger moves.'}]},
+
+   add:{asm:'add x7, x5, x6',hex:'0x006283B3',beats:[
+    fetch(),
+    {b:DB,w:DW,s:DS,
+     t:'R-type: rs1=5, rs2=6, rd=7, funct7=0000000 so this is ordinary ALU maths, not MUL or CRC. Both register ports read at once — the register file has two independent async read ports precisely so this works in one beat.'},
+    {b:['b-cu','b-rf','b-muxa','b-muxb','b-alu'],w:['w-rf-muxa','w-rf-muxb','w-muxa-alu','w-muxb-alu'],
+     s:{state:'2 EXECUTE',alu_src_a:'0 · rs1',alu_src_b:'0 · rs2',alu_op:'1 · ADD',rd_we:'0'},
+     t:'Both muxes take the register path. Q = 10 + 5 = 15 (0xF). The multiplier and CRC unit are computing on the same two operands right now too — they simply will not be selected.'},
+    {b:['b-cu','b-alu','b-wb','b-rf','b-pc','b-add4','b-pcmux'],w:['w-alu-wb','w-wb-rf','w-pc-add4','w-add4-pcmux','w-pcmux-pc'],
+     s:{state:'3 WRITEBACK',wb_sel:'0 · ALU',rd_we:'1',pc_src:'0 · PC+4',pc_write:'1'},
+     t:'x7 = 0x0000000F. This is exactly the Stage-2 test — 0xF appearing on wb_o was the evidence the whole register/ALU datapath had closed.'}]},
+
+   lw:{asm:'lw x7, 0(x6)',hex:'0x00032383',beats:[
+    fetch(),
+    {b:DB.concat(['b-imm']),w:DW.concat(['w-ir-imm']),s:DS,
+     t:'I-type, like addi — but opcode is OP-LOAD. rs1=6 is the base address, rd=7 the destination, funct3=010 means "word". The offset immediate here is 0.'},
+    {b:['b-cu','b-rf','b-muxa','b-muxb','b-imm','b-alu','b-amux','b-dec','b-dmem','b-lsu','b-spl'],
+     w:['w-rf-muxa','w-imm-muxb','w-muxa-alu','w-muxb-alu','w-alu-amux','w-amux-dec','w-dec-dmem','w-spl-lsu'],
+     s:{state:'2 EXECUTE',addr_src:'1 · ALU',alu_op:'1 · ADD',mem_oe:'1',mem_we:'0',rd_we:'0'},
+     t:'The ALU computes rs1 + offset = 0x10010000 — this beat the ALU is an address calculator, not a calculator. addr_src flips the address mux to the ALU, and the decoder routes the read to DMEM. DMEM’s read is registered, so the data will not appear until the next edge.'},
+    {b:['b-cu','b-dmem','b-dec','b-lsu','b-wb','b-rf','b-pc','b-add4','b-pcmux'],
+     w:['w-dmem-dec','w-dec-lsu','w-lsu-wb','w-wb-rf','w-pc-add4','w-add4-pcmux','w-pcmux-pc'],
+     s:{state:'3 WRITEBACK',wb_sel:'1 · LSU',rd_we:'1',mem_oe:'1',pc_write:'1'},
+     t:'The data arrives one clock late, flows DMEM → decoder → core_data_o → LSU.mem_data_i (the amber wire). The LSU formats it for the requested size and wb_sel=1 routes it into x7. This is why the Control Unit holds mem_oe high across two beats.'}]},
+
+   sw:{asm:'sw x5, 0(x6)',hex:'0x00532023',beats:[
+    fetch(),
+    {b:DB,w:DW,s:DS,
+     t:'S-type. rs1=6 is the base, rs2=5 is the data to store, funct3=010 is "word". There is no rd — the destination field was stolen to hold half the offset, which is why nothing gets written to a register at the end.'},
+    {b:['b-cu','b-rf','b-muxa','b-muxb','b-imm','b-alu','b-amux','b-dec','b-dmem','b-lsu','b-spl'],
+     w:['w-rf-muxa','w-imm-muxb','w-muxa-alu','w-muxb-alu','w-alu-amux','w-amux-dec','w-rf-fan','w-spl-lsu','w-alu-lsu','w-lsu-mem','w-dec-dmem'],
+     s:{state:'2 EXECUTE',addr_src:'1 · ALU',alu_op:'1 · ADD',mem_we:'1',mem_oe:'0',rd_we:'0'},
+     t:'The ALU computes the address. The LSU takes rs2 as the store data and emits two things: the word to write (mem_data_o = 0x64) and the byte-write mask (byte_write_i = 1111, "change all four bytes"). DMEM commits on the clock edge.'},
+    {b:['b-cu','b-pc','b-add4','b-pcmux'],w:['w-pc-add4','w-add4-pcmux','w-pcmux-pc'],
+     s:{state:'3 WRITEBACK',rd_we:'0',wb_sel:'—',pc_src:'0 · PC+4',pc_write:'1'},
+     t:'rd_we stays 0 — stores write no register. Only the PC advances. In a waveform this shows up as a visible gap in rd_addr_i, and that gap is itself evidence the store behaved.'}]},
+
+   beq:{asm:'beq x5, x6, +8',hex:'B-type',beats:[
+    fetch(),
+    {b:DB.concat(['b-imm','b-bc']),w:DW.concat(['w-ir-imm','w-spl-bc','w-rf-fan','w-bc-cu']),s:DS,
+     t:'B-type. Both registers are read and handed straight to the branch comparator, which uses funct3=000 to mean "equal?". It answers immediately — branch_taken_o goes high before the ALU has even started.'},
+    {b:['b-cu','b-pc','b-muxa','b-muxb','b-imm','b-alu','b-bc'],
+     w:['w-pc-muxa','w-imm-muxb','w-muxa-alu','w-muxb-alu','w-bc-cu'],
+     s:{state:'2 EXECUTE',alu_src_a:'1 · PC',alu_src_b:'1 · imm',alu_op:'1 · ADD',branch_taken:'1',rd_we:'0'},
+     t:'Here is why the PC is wired into the ALU: the branch target is PC + offset, so alu_src_a switches from rs1 to PC. The comparator answered the question; the ALU works out where to go. Two jobs, two units, one beat.'},
+    {b:['b-cu','b-alu','b-pcmux','b-pc'],w:['w-alu-pcmux','w-pcmux-pc'],
+     s:{state:'3 WRITEBACK',pc_src:'1 · ALU',pc_write:'1',rd_we:'0',wb_sel:'—'},
+     t:'Because branch_taken was 1, pc_src selects the ALU result instead of PC+4. The PC jumps and the next instruction is skipped. Had the comparator said 0, pc_src would stay 0 and this beat would be indistinguishable from any other.'}]},
+
+   jal:{asm:'jal x1, +8',hex:'J-type',beats:[
+    fetch(),
+    {b:DB.concat(['b-imm']),w:DW.concat(['w-ir-imm']),s:DS,
+     t:'J-type. rd=1 (x1 is the conventional return-address register). The 20-bit jump offset is scattered across the instruction in a deliberately shuffled order, which imm_gen reassembles.'},
+    {b:['b-cu','b-pc','b-muxa','b-muxb','b-imm','b-alu','b-add4'],
+     w:['w-pc-muxa','w-imm-muxb','w-muxa-alu','w-muxb-alu','w-pc-add4'],
+     s:{state:'2 EXECUTE',alu_src_a:'1 · PC',alu_src_b:'1 · imm',alu_op:'1 · ADD',rd_we:'0'},
+     t:'ALU computes PC + offset — the jump target. Meanwhile the +4 adder has, as always, been quietly producing PC+4. That value is about to become useful for the first time.'},
+    {b:['b-cu','b-alu','b-add4','b-pcmux','b-pc','b-wb','b-rf'],
+     w:['w-alu-pcmux','w-pcmux-pc','w-add4-wb','w-wb-rf'],
+     s:{state:'3 WRITEBACK',pc_src:'1 · ALU',wb_sel:'4 · PC+4',rd_we:'1',pc_write:'1'},
+     t:'Two things happen at once: the PC jumps to the target, and PC+4 is written into x1 as the return address. That is the whole difference between a jump and a function call — remembering where you came from.'}]},
+
+   mul:{asm:'mul x7, x5, x6',hex:'funct7 = 0000001',beats:[
+    fetch(),
+    {b:DB,w:DW,s:DS,
+     t:'Looks exactly like add — same opcode 0110011. The Control Unit tells them apart on funct7: 0000001 means the multiply family. That is the entire mechanism behind the Zmmul extension.'},
+    {b:['b-cu','b-rf','b-mul'],w:['w-rf-fan'],
+     s:{state:'2 EXECUTE',mul_op:'0 · MUL',alu_op:'(ignored)',rd_we:'0'},
+     t:'The multiplier’s inputs are hardwired to rs1 and rs2, so it has already been computing. mul_op=0 asks for the low 32 bits of the product. 7 × 6 = 42 (0x2A). The ALU is also computing something; nobody cares.'},
+    {b:['b-cu','b-mul','b-wb','b-rf','b-pc','b-add4','b-pcmux'],
+     w:['w-mul-wb','w-wb-rf','w-pc-add4','w-add4-pcmux','w-pcmux-pc'],
+     s:{state:'3 WRITEBACK',wb_sel:'2 · MUL',rd_we:'1',pc_write:'1'},
+     t:'wb_sel = 2 points the writeback mux at the multiplier. x7 = 0x2A. Selecting a different input to one mux is the whole cost of adding an instruction to this CPU.'}]},
+
+   crcb:{asm:'crcb x8, x6, x5',hex:'0x80530433',beats:[
+    fetch(),
+    {b:DB,w:DW,s:DS,
+     t:'Your team’s custom Xicrc extension. Again opcode 0110011, but funct7 = 1000000 — a pattern the base ISA leaves unused. Encode it as 0100000 by mistake and the decoder reads SUB instead, which is exactly what happened in Stage 5.'},
+    {b:['b-cu','b-rf','b-crc'],w:['w-rf-fan'],
+     s:{state:'2 EXECUTE',crc_op:'0 · CRCB (8-bit)',rd_we:'0'},
+     t:'The CRC unit runs rs1 through the CRC-16-CCITT polynomial 0x1021, seeded from rs2’s low 16 bits. A checksum that would take roughly twenty instructions in software, done in one beat of dedicated logic.'},
+    {b:['b-cu','b-crc','b-wb','b-rf','b-pc','b-add4','b-pcmux'],
+     w:['w-crc-wb','w-wb-rf','w-pc-add4','w-add4-pcmux','w-pcmux-pc'],
+     s:{state:'3 WRITEBACK',wb_sel:'3 · CRC',rd_we:'1',pc_write:'1'},
+     t:'wb_sel = 3. x8 receives the checksum. This instruction is the reason the whole project is called an extension: the datapath did not change, only one more input on one mux.'}]}
+  };
+
+  var BEATNAME=['Beat 0 · FETCH','Beat 1 · DECODE','Beat 2 · EXECUTE','Beat 3 · WRITEBACK'];
+  var cur='addi', beat=0;
+  var svg=document.getElementById('dp');
+  if(!svg) return;
+  var blocks=svg.querySelectorAll('.blk'), wires=svg.querySelectorAll('.wire');
+
+  function render(){
+    var d=INS[cur], st=d.beats[beat];
+    for(var i=0;i<blocks.length;i++) blocks[i].classList.remove('on');
+    for(var j=0;j<wires.length;j++) wires[j].classList.remove('on');
+    st.b.forEach(function(id){var e=document.getElementById(id); if(e) e.classList.add('on');});
+    st.w.forEach(function(id){var e=document.getElementById(id); if(e) e.classList.add('on');});
+    document.getElementById('dp-beat').textContent=BEATNAME[beat];
+    document.getElementById('dp-asm').innerHTML=d.asm+' &nbsp;·&nbsp; <span style="color:var(--ink-3)">'+d.hex+'</span>';
+    document.getElementById('dp-text').textContent=st.t;
+    var h='';
+    for(var k in st.s){
+      var v=st.s[k], off=(v==='0'||v==='—'||v==='(ignored)'||/^0 /.test(v))?' off':'';
+      h+='<div class="sigrow"><span class="k">'+k+'</span><span class="v'+off+'">'+v+'</span></div>';
+    }
+    document.getElementById('dp-sigs').innerHTML=h;
+    document.querySelectorAll('[data-ins]').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.ins===cur);});
+    document.querySelectorAll('[data-beat]').forEach(function(b){b.setAttribute('aria-pressed',+b.dataset.beat===beat);});
+  }
+  document.querySelectorAll('[data-ins]').forEach(function(b){
+    b.addEventListener('click',function(){cur=b.dataset.ins;render();});});
+  document.querySelectorAll('[data-beat]').forEach(function(b){
+    b.addEventListener('click',function(){beat=+b.dataset.beat;render();});});
+  render();
+})();
+</script>
+</section>
+<section id="memory">
+  <div class="sec-head"><span class="sec-num">05</span><h2>The map of the world</h2></div>
+  <p class="sub">The CPU sees one flat address space, but only two regions are wired up. The
+  Address_Decoder doesn't read the whole address — it checks the leading bits, like a postcode
+  sorter, and routes accordingly.</p>
+
+  <figure>
+    <div class="fig-body">
+      <svg class="dg" viewBox="0 0 900 300" role="img" aria-label="Memory map showing IMEM as read-only ROM at 0x00400000 containing 259 instructions followed by five data constants, and DMEM as 8 kilobytes of read-write SRAM at 0x10010000.">
+        <text x="20" y="18" font-size="10.5" letter-spacing="1.1" fill="var(--ink-3)">IMEM · READ-ONLY · 4 MB</text>
+        <rect x="20" y="28" width="470" height="46" rx="3" fill="var(--surface-2)" stroke="var(--rule-2)"/>
+        <text x="255" y="49" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">259 instructions — the program</text>
+        <text x="255" y="65" text-anchor="middle" font-size="9.5" fill="var(--ink-3)">0x00400000 → 0x004003F4</text>
+        <rect x="490" y="28" width="180" height="46" rx="3" fill="var(--signal-soft)" stroke="var(--signal)"/>
+        <text x="580" y="46" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--signal)">data constants</text>
+        <text x="580" y="60" text-anchor="middle" font-size="9" fill="var(--ink-2)">12345678 · 90ABCDEF</text>
+        <text x="580" y="70" text-anchor="middle" font-size="9" fill="var(--ink-2)">11111111 · 22222222 · 33333333</text>
+        <text x="20" y="90" font-size="9.5" fill="var(--ink-3)">0x00400000</text>
+        <text x="490" y="90" font-size="9.5" fill="var(--signal)">0x004003F8</text>
+        <text x="670" y="90" font-size="9.5" text-anchor="end" fill="var(--ink-3)">0x00400408</text>
+        <text x="690" y="46" font-size="10" fill="var(--ink-2)">mask 0xFFC00000</text>
+        <text x="690" y="60" font-size="10" fill="var(--ink-3)">combinational read — instant</text>
+
+        <text x="20" y="132" font-size="10.5" letter-spacing="1.1" fill="var(--ink-3)">DMEM · READ / WRITE · 8 KB</text>
+        <rect x="20" y="142" width="650" height="46" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <text x="345" y="163" text-anchor="middle" font-size="12" font-weight="600" fill="var(--accent-ink)">2048 words × 32 bits — scratch data, byte-addressable</text>
+        <text x="345" y="179" text-anchor="middle" font-size="9.5" fill="var(--ink-2)">0x10010000 → 0x10011FFF · word index = address[12:2]</text>
+        <text x="690" y="160" font-size="10" fill="var(--ink-2)">mask 0xFFFFE000</text>
+        <text x="690" y="174" font-size="10" fill="var(--ink-3)">registered read — one clock late</text>
+
+        <line x1="20" y1="216" x2="880" y2="216" stroke="var(--rule)"/>
+        <text x="20" y="238" font-size="11.5" font-weight="600" fill="var(--ink)">The decoder's whole job, in two lines:</text>
+        <text x="20" y="258" font-size="11" fill="var(--ink-2)">IMEM  if  (address &amp; 0xFFC00000) == 0x00400000     — route oe only. Never we. It is a ROM.</text>
+        <text x="20" y="276" font-size="11" fill="var(--ink-2)">DMEM  if  (address &amp; 0xFFFFE000) == 0x10010000     — route oe, we and the byte mask.</text>
+        <text x="20" y="294" font-size="11" fill="var(--ink-3)">Both read paths then merge into one wire back to the core: core_data_o.</text>
+      </svg>
+    </div>
+    <figcaption><span class="fno">Fig. 3</span>The address space. Note the amber block: the firmware keeps five constants <em>inside the instruction ROM</em> and loads them with <code>lw</code>. That is completely normal — it's where compilers put constants — and it is the fact the whole of section 06 turns on.</figcaption>
+  </figure>
+
+  <div class="eli5"><b>ELI5 · why constants live in the recipe book</b>
+  <p>The book on the wall isn't only recipes. The back few pages are a reference table — oven
+  temperatures, conversion charts. The cook reads from those pages the same way they'd read from a
+  label in the fridge. So <em>"go look something up"</em> has to work in both places.</p></div>
+</section>
+
+<section id="bug">
+  <div class="sec-head"><span class="sec-num">06</span><h2>The bug worth telling in an interview</h2></div>
+  <p class="sub">The firmware ran all 259 instructions and settled at <code>0x004003F4</code> —
+  the FAIL address. The signal that looked wrong was a CRC result. The CRC unit was flawless.</p>
+
+  <figure>
+    <div class="fig-body">
+      <svg class="dg" viewBox="0 0 900 268" role="img" aria-label="Before and after comparison of the load data path. Before, the load-store unit read only from data memory, so a load from an instruction-memory address returned nothing useful. After, the load-store unit reads from the address decoder's merged output, which serves whichever memory the address selects.">
+        <text x="20" y="16" font-size="10.5" letter-spacing="1.1" fill="var(--alert)">BEFORE — WRONG</text>
+        <g>
+          <rect x="20" y="30" width="104" height="34" rx="3" fill="var(--surface-2)" stroke="var(--rule-2)"/>
+          <text x="72" y="51" text-anchor="middle" font-size="11" fill="var(--ink-3)">IMEM</text>
+          <rect x="20" y="112" width="104" height="34" rx="3" fill="var(--surface-2)" stroke="var(--rule-2)"/>
+          <text x="72" y="133" text-anchor="middle" font-size="11" fill="var(--ink)">DMEM</text>
+          <rect x="176" y="66" width="122" height="44" rx="3" fill="var(--surface-2)" stroke="var(--rule-2)"/>
+          <text x="237" y="84" text-anchor="middle" font-size="11" fill="var(--ink)">Address_Decoder</text>
+          <text x="237" y="98" text-anchor="middle" font-size="8.5" fill="var(--ink-3)">core_data_o</text>
+          <rect x="350" y="30" width="82" height="34" rx="3" fill="var(--surface-2)" stroke="var(--rule-2)"/>
+          <text x="391" y="51" text-anchor="middle" font-size="11" fill="var(--ink)">IR</text>
+          <rect x="350" y="112" width="82" height="34" rx="3" fill="var(--alert-soft)" stroke="var(--alert)"/>
+          <text x="391" y="133" text-anchor="middle" font-size="11" fill="var(--alert)">LSU</text>
+          <g color="var(--rule-2)">
+            <path d="M124,47 H150 V80 H174" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+            <path d="M124,129 H150 V96 H174" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+            <path d="M298,80 H322 V47 H348" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+          </g>
+          <g color="var(--alert)">
+            <path d="M124,140 H240 V196 H370 V148" fill="none" stroke="currentColor" stroke-width="2" marker-end="url(#a2)"/>
+          </g>
+          <text x="240" y="212" font-size="9.5" fill="var(--alert)">DMEM.dmem_rdata_o → LSU.mem_data_i</text>
+          <text x="20" y="236" font-size="10.5" fill="var(--ink-2)">A load from 0x004003F8 (an IMEM address) never reaches the LSU.</text>
+          <text x="20" y="252" font-size="10.5" fill="var(--alert)">x6 came back holding 0x004003F8 — the address, not the data.</text>
+        </g>
+
+        <line x1="466" y1="8" x2="466" y2="260" stroke="var(--rule)"/>
+
+        <text x="490" y="16" font-size="10.5" letter-spacing="1.1" fill="var(--accent)">AFTER — CORRECT</text>
+        <g>
+          <rect x="490" y="30" width="104" height="34" rx="3" fill="var(--surface-2)" stroke="var(--rule-2)"/>
+          <text x="542" y="51" text-anchor="middle" font-size="11" fill="var(--ink)">IMEM</text>
+          <rect x="490" y="112" width="104" height="34" rx="3" fill="var(--surface-2)" stroke="var(--rule-2)"/>
+          <text x="542" y="133" text-anchor="middle" font-size="11" fill="var(--ink)">DMEM</text>
+          <rect x="646" y="66" width="122" height="44" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="707" y="84" text-anchor="middle" font-size="11" fill="var(--accent-ink)">Address_Decoder</text>
+          <text x="707" y="98" text-anchor="middle" font-size="8.5" fill="var(--accent-ink)">core_data_o</text>
+          <rect x="820" y="30" width="62" height="34" rx="3" fill="var(--surface-2)" stroke="var(--rule-2)"/>
+          <text x="851" y="51" text-anchor="middle" font-size="11" fill="var(--ink)">IR</text>
+          <rect x="820" y="112" width="62" height="34" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="851" y="133" text-anchor="middle" font-size="11" fill="var(--accent-ink)">LSU</text>
+          <g color="var(--rule-2)">
+            <path d="M594,47 H620 V80 H644" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+            <path d="M594,129 H620 V96 H644" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+          </g>
+          <g color="var(--accent)">
+            <path d="M768,80 H792 V47 H818" fill="none" stroke="currentColor" stroke-width="2" marker-end="url(#a2)"/>
+            <path d="M768,96 H792 V129 H818" fill="none" stroke="currentColor" stroke-width="2" marker-end="url(#a2)"/>
+          </g>
+          <text x="700" y="212" font-size="9.5" fill="var(--accent)">Address_Decoder.core_data_o → LSU.mem_data_i</text>
+          <text x="490" y="236" font-size="10.5" fill="var(--ink-2)">One merged read path serves instructions AND loads.</text>
+          <text x="490" y="252" font-size="10.5" fill="var(--accent)">x6 = 0x12345678. CRC chain correct. Firmware PASSED.</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption><span class="fno">Fig. 4</span>One wire moved. On the left the LSU stares at DMEM and can never see the instruction ROM; on the right it reads the decoder's merged output, which already knows which memory the address belongs to. <code>DMEM.dmem_rdata_o</code> now has exactly one destination.</figcaption>
+  </figure>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th class="m">Step</th><th>What you looked at</th><th>What you found</th></tr></thead>
+      <tbody>
+        <tr><td class="m">1</td><td>Where <code>pc_o</code> settled</td><td><code>0x004003F4</code> — the FAIL self-loop</td></tr>
+        <tr><td class="m">2</td><td>The first failing check</td><td><code>bne x10, x17</code> at <code>0x400374</code>; x17 expected <code>0x1E82</code></td></tr>
+        <tr><td class="m">3</td><td>Where x10 came from</td><td>A chain of <code>crcw</code> ending at <code>0x400364</code></td></tr>
+        <tr><td class="m">4</td><td>What fed the CRC</td><td>x6 and x7, both from <code>lw</code> at base <code>0x004003F8</code></td></tr>
+        <tr><td class="m">5</td><td><span class="tag x">smoking gun</span> the value of x6</td><td><code>0x004003F8</code> — the address itself, not <code>0x12345678</code></td></tr>
+        <tr><td class="m">6</td><td>The wire feeding <code>LSU.mem_data_i</code></td><td>Came from DMEM only. Rewired to the decoder. <span class="tag a">PASS</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="eli5"><b>The whole bug in one sentence</b>
+  <p>The runner was only ever allowed to go to the fridge — so when the recipe said "look up the
+  value in the appendix of the book", he came back holding the <em>page number</em> instead of the
+  value.</p></div>
+
+  <div class="prose">
+    <p><strong>Three things this teaches.</strong> First: the failing signal was a CRC result, but
+    the CRC module was perfect — it was computing correct answers on garbage input. When a block
+    produces a wrong answer, check its inputs before you check its logic. That instinct is the
+    integration engineer's core skill.</p>
+    <p>Second: the "obvious" wiring was the wrong wiring. <em>Loads read data memory</em> is true
+    95% of the time and completely wrong here. The correct mental model is <em>loads read whatever
+    the address decoder decided the address points at.</em></p>
+    <p>Third: you never read 259 instructions. You found the failing branch, walked backwards
+    through the data dependencies — x10 ← crcw ← x6 ← lw — and found the first value that was
+    wrong. Four hops. Bisect by data, not by code.</p>
+  </div>
+</section>
+<style>
+.scope{background:var(--scope-bg);border-radius:3px;padding:14px 10px 10px}
+.scope svg{display:block;min-width:900px;width:100%;height:auto}
+.scope text{font-family:"IBM Plex Mono",monospace}
+.sv-lbl{fill:var(--scope-ink);font-size:11px}
+.sv-val{fill:var(--scope-trace);font-size:10.5px}
+.sv-tr{fill:none;stroke:var(--scope-trace);stroke-width:1.4}
+.sv-hex{fill:none;stroke:var(--scope-trace);stroke-width:1.2}
+.sv-grid{stroke:var(--scope-line);stroke-width:1}
+.sv-ax{fill:var(--scope-dim);font-size:9.5px}
+.sv-note{fill:var(--scope-hi);font-size:10px}
+.sv-nl{stroke:var(--scope-hi);stroke-width:1;stroke-dasharray:3 2;fill:none}
+.legend{display:grid;grid-template-columns:repeat(1,1fr);
+  gap:16px 26px;margin-top:26px;font-size:14px;color:var(--ink-2)}
+@media(min-width:640px){.legend{grid-template-columns:repeat(2,1fr)}}
+.legend div{display:flex;gap:9px;align-items:flex-start;min-width:0}
+.legend div span{min-width:0}
+.legend b{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent-ink);flex:none}
+</style>
+
+<section id="waves">
+  <div class="sec-head"><span class="sec-num">07</span><h2>How to read the waveforms</h2></div>
+  <p class="sub">A waveform viewer is an oscilloscope for a simulated chip: every row is one wire,
+  and time runs left to right. Multi-bit signals are drawn as stretched hexagons with the value
+  inside — the pinch points are the moments the value changes. This is your Stage-4 capture,
+  redrawn clean.</p>
+
+  <figure>
+    <div class="fig-body" style="padding:14px">
+      <div class="scope">
+      <svg viewBox="0 0 1000 400" role="img" aria-label="Annotated waveform of the Stage 4 memory test: clock, reset, program counter stepping every forty nanoseconds, instruction register showing addi, lui, sw and lw, the state signal counting zero to three, and the load-store signals proving 0x64 was written to data memory and read back.">
+        <g class="sv-grid">
+          <line x1="160" y1="20" x2="160" y2="310"/><line x1="360" y1="20" x2="360" y2="310"/>
+          <line x1="560" y1="20" x2="560" y2="310"/><line x1="760" y1="20" x2="760" y2="310"/>
+          <line x1="960" y1="20" x2="960" y2="310"/>
+          <line x1="10" y1="178" x2="990" y2="178"/>
+        </g>
+
+        <g class="sv-lbl">
+          <text x="12" y="41">clk_i</text><text x="12" y="71">rst_i</text>
+          <text x="12" y="101">pc_o</text><text x="12" y="133">ir_o</text><text x="12" y="165">state_o</text>
+          <text x="12" y="203">byte_write_i</text><text x="12" y="233">mem_data_o</text>
+          <text x="12" y="263">dmem_rdata_o</text><text x="12" y="293">core_data_i</text>
+        </g>
+        <g class="sv-ax">
+          <text x="12" y="215">LSU</text><text x="12" y="245">LSU</text>
+          <text x="12" y="275">DMEM</text><text x="12" y="305">LSU</text>
+        </g>
+
+        <path id="wv-clk" class="sv-tr" d=""/>
+        <path class="sv-tr" d="M160,72 H172 V58 H960"/>
+        <g id="wv-state"></g>
+
+        <g class="sv-hex">
+          <path d="M160,97 L165,88 L315,88 L320,97 L315,106 L165,106 Z"/>
+          <path d="M320,97 L325,88 L475,88 L480,97 L475,106 L325,106 Z"/>
+          <path d="M480,97 L485,88 L635,88 L640,97 L635,106 L485,106 Z"/>
+          <path d="M640,97 L645,88 L795,88 L800,97 L795,106 L645,106 Z"/>
+          <path d="M800,97 L805,88 L955,88 L960,97 L955,106 L805,106 Z"/>
+        </g>
+        <g class="sv-val" text-anchor="middle">
+          <text x="240" y="101">400000</text><text x="400" y="101">400004</text>
+          <text x="560" y="101">400008</text><text x="720" y="101">40000c</text><text x="880" y="101">400010</text>
+        </g>
+
+        <g class="sv-hex">
+          <path d="M160,129 L163,120 L197,120 L200,129 L197,138 L163,138 Z"/>
+          <path d="M200,129 L205,120 L355,120 L360,129 L355,138 L205,138 Z"/>
+          <path d="M360,129 L365,120 L515,120 L520,129 L515,138 L365,138 Z"/>
+          <path d="M520,129 L525,120 L675,120 L680,129 L675,138 L525,138 Z"/>
+          <path d="M680,129 L685,120 L835,120 L840,129 L835,138 L685,138 Z"/>
+          <path d="M840,129 L845,120 L955,120 L960,129 L955,138 L845,138 Z"/>
+        </g>
+        <g class="sv-val" text-anchor="middle">
+          <text x="180" y="133" font-size="9">13</text><text x="280" y="133">6400293</text>
+          <text x="440" y="133">10010337</text><text x="600" y="133">532023</text>
+          <text x="760" y="133">32383</text><text x="900" y="133">13</text>
+        </g>
+        <g class="sv-ax" text-anchor="middle" font-size="9">
+          <text x="280" y="148">addi x5, x0, 100</text><text x="440" y="148">lui x6, 0x10010</text>
+          <text x="600" y="148">sw x5, 0(x6)</text><text x="760" y="148">lw x7, 0(x6)</text>
+        </g>
+
+        <path class="sv-tr" d="M160,206 H560 M640,206 H960"/>
+        <g class="sv-hex"><path d="M560,197 L565,190 L635,190 L640,197 L635,204 L565,204 Z"/></g>
+        <text class="sv-val" x="600" y="201" text-anchor="middle">f</text>
+
+        <path class="sv-tr" d="M160,236 H560 M640,236 H960"/>
+        <g class="sv-hex"><path d="M560,227 L565,220 L635,220 L640,227 L635,234 L565,234 Z"/></g>
+        <text class="sv-val" x="600" y="231" text-anchor="middle">64</text>
+
+        <path class="sv-tr" d="M160,266 H720 M800,266 H960"/>
+        <g class="sv-hex"><path d="M720,257 L725,250 L795,250 L800,257 L795,264 L725,264 Z"/></g>
+        <text class="sv-val" x="760" y="261" text-anchor="middle">64</text>
+
+        <path class="sv-tr" d="M160,296 H720 M800,296 H960"/>
+        <g class="sv-hex"><path d="M720,287 L725,280 L795,280 L800,287 L795,294 L725,294 Z"/></g>
+        <text class="sv-val" x="760" y="291" text-anchor="middle">64</text>
+
+        <g class="sv-ax">
+          <text x="160" y="324" text-anchor="middle">0 ns</text><text x="360" y="324" text-anchor="middle">50 ns</text>
+          <text x="560" y="324" text-anchor="middle">100 ns</text><text x="760" y="324" text-anchor="middle">150 ns</text>
+          <text x="955" y="324" text-anchor="end">200 ns</text>
+        </g>
+
+        <g class="sv-nl">
+          <path d="M600,190 V346"/><path d="M760,250 V368"/><path d="M240,88 V60 H300"/>
+        </g>
+        <g class="sv-note">
+          <text x="606" y="346">SW · mask 1111 = write all four bytes, data 0x64 goes out</text>
+          <text x="766" y="368">LW · the same 0x64 comes back — one full instruction later, because DMEM's read is registered</text>
+          <text x="306" y="60">each PC step is 40 ns = four clock ticks = one instruction</text>
+        </g>
+      </svg>
+      </div>
+    </div>
+    <figcaption><span class="fno">Fig. 5</span>Stage 4, the load/store round-trip. The panel keeps the viewer's own dark palette in both page themes, because that is what you are actually looking at on screen. The <code>ir_o</code> row is drawn with its true one-beat lag: the IR latches at the end of FETCH, not at the same instant the PC settles.</figcaption>
+  </figure>
+
+  <div class="legend">
+    <div><b>x</b><span>Red <code>x</code> means undriven — nothing is sourcing that wire. Trace upstream to the <em>first</em> signal that goes x; that's the missing wire.</span></div>
+    <div><b>gap</b><span>A multi-bit signal sitting flat and unlabelled is the value 0. The gap in <code>rd_addr_i</code> during <code>sw</code> is the store correctly writing no register.</span></div>
+    <div><b>flicker</b><span>Values wobbling between clock edges are combinational muxes settling. Only the value at the rising edge is stored. Harmless.</span></div>
+    <div><b>blk36xx</b><span>Auto-generated ChipInventor instance names. The readable signals nest underneath them — your register file is <code>blk2832_43</code>.</span></div>
+  </div>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Reading the firmware verdict — watch one signal</th><th class="m">pc_o settles at</th><th class="m">x4</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>Firmware does <code>addi x4, x0, 0</code> then <code>jal x0, 0</code></td><td class="m">0x004003EC</td><td class="m">0x00000000</td><td><span class="tag a">PASS</span></td></tr>
+        <tr><td>Firmware does <code>addi x4, x0, -1</code> then <code>jal x0, 0</code></td><td class="m">0x004003F4</td><td class="m">0xFFFFFFFF</td><td><span class="tag x">FAIL</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="eli5"><b>ELI5 · why you don't read all 259 instructions</b>
+  <p>The test program's last act is to walk into one of two rooms and lock the door behind it —
+  <code>jal x0, 0</code> is a deliberate jump-to-itself. You don't watch the exam; you check which
+  room it's standing in. On the waveform that's <code>pc_o</code> freezing on one value while
+  <code>state_o</code> keeps ticking underneath. The CPU hasn't crashed. It's finished.</p></div>
+
+  <div class="prose">
+    <p><strong>Reading a register you can't see.</strong> When the viewer won't expose
+    <code>registers[0:31]</code>, watch three signals together: <code>rd_addr_i</code>,
+    <code>rd_data_i</code> and <code>reg_we_i</code>. Find the last rising edge where
+    <code>rd_addr_i</code> equals your register number and <code>reg_we_i</code> is 1 — the value on
+    <code>rd_data_i</code> at that instant is what the register holds. You can't open the cupboard,
+    but you can log every delivery.</p>
+  </div>
+</section>
+<script>
+(function(){
+  var clk=document.getElementById('wv-clk'), st=document.getElementById('wv-state');
+  if(!clk||!st) return;
+  var d='M160,44', x=160;
+  for(var i=0;i<20;i++){ d+=' V28 H'+(x+20)+' V44 H'+(x+40); x+=40; }
+  clk.setAttribute('d',d);
+  var svgns='http://www.w3.org/2000/svg', frag=document.createDocumentFragment();
+  for(var k=0;k<20;k++){
+    var bx=160+k*40, v=k%4;
+    var r=document.createElementNS(svgns,'rect');
+    r.setAttribute('x',bx+2); r.setAttribute('y',152); r.setAttribute('width',36);
+    r.setAttribute('height',16); r.setAttribute('rx',2);
+    r.setAttribute('fill', v===0?'transparent':'none');
+    r.setAttribute('stroke', v===0?'none':'var(--scope-trace)');
+    r.setAttribute('stroke-width','1.1');
+    frag.appendChild(r);
+    var t=document.createElementNS(svgns,'text');
+    t.setAttribute('x',bx+20); t.setAttribute('y',164); t.setAttribute('text-anchor','middle');
+    t.setAttribute('class', v===0?'sv-ax':'sv-val'); t.setAttribute('font-size','9.5');
+    t.textContent=v; frag.appendChild(t);
+  }
+  var base=document.createElementNS(svgns,'path');
+  base.setAttribute('class','sv-tr'); base.setAttribute('d','M160,168 H960');
+  base.setAttribute('stroke','var(--scope-line)');
+  st.appendChild(base); st.appendChild(frag);
+})();
+</script>
+
+<section id="silicon">
+  <div class="sec-head"><span class="sec-num">08</span><h2>From circuit to silicon</h2></div>
+  <p class="sub">Everything so far has been a <em>description</em> of a circuit and a
+  <em>simulation</em> of that description. Neither is a chip. OpenLane is the toolchain that turns
+  the description into a physical layout a foundry could actually print on 130 nm silicon.</p>
+
+  <figure>
+    <div class="fig-body">
+      <svg class="dg" viewBox="0 0 940 240" role="img" aria-label="The OpenLane flow from Verilog through synthesis, timing analysis, floorplan, power grid, placement, clock tree synthesis and routing to a GDSII layout, with the failure point marked at routing.">
+        <g>
+          <rect x="14" y="40" width="96" height="46" rx="3" class="bx"/>
+          <text class="bx-t" x="62" y="60" text-anchor="middle" fill="var(--ink)">Verilog RTL</text>
+          <text class="bx-s" x="62" y="74" text-anchor="middle" fill="var(--ink-3)">your design</text>
+
+          <rect x="130" y="40" width="96" height="46" rx="3" class="bx"/>
+          <text class="bx-t" x="178" y="60" text-anchor="middle" fill="var(--ink)">Synthesis</text>
+          <text class="bx-s" x="178" y="74" text-anchor="middle" fill="var(--ink-3)">→ Sky130 cells</text>
+
+          <rect x="246" y="40" width="96" height="46" rx="3" class="bx"/>
+          <text class="bx-t" x="294" y="60" text-anchor="middle" fill="var(--ink)">Floorplan</text>
+          <text class="bx-s" x="294" y="74" text-anchor="middle" fill="var(--ink-3)">die size · IO · PDN</text>
+
+          <rect x="362" y="40" width="96" height="46" rx="3" class="bx"/>
+          <text class="bx-t" x="410" y="60" text-anchor="middle" fill="var(--ink)">Placement</text>
+          <text class="bx-s" x="410" y="74" text-anchor="middle" fill="var(--ink-3)">global → detailed</text>
+
+          <rect x="478" y="40" width="96" height="46" rx="3" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text class="bx-t" x="526" y="60" text-anchor="middle" fill="var(--accent-ink)">CTS</text>
+          <text class="bx-s" x="526" y="74" text-anchor="middle" fill="var(--ink-2)">clock to every cell</text>
+
+          <rect x="594" y="40" width="96" height="46" rx="3" fill="var(--alert-soft)" stroke="var(--alert)" stroke-width="1.6"/>
+          <text class="bx-t" x="642" y="60" text-anchor="middle" fill="var(--alert)">Routing</text>
+          <text class="bx-s" x="642" y="74" text-anchor="middle" fill="var(--ink-2)">draw every wire</text>
+
+          <rect x="710" y="40" width="96" height="46" rx="3" class="bx"/>
+          <text class="bx-t" x="758" y="60" text-anchor="middle" fill="var(--ink)">GDSII</text>
+          <text class="bx-s" x="758" y="74" text-anchor="middle" fill="var(--ink-3)">the layout file</text>
+        </g>
+        <g color="var(--rule-2)">
+          <line x1="110" y1="63" x2="128" y2="63" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+          <line x1="226" y1="63" x2="244" y2="63" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+          <line x1="342" y1="63" x2="360" y2="63" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+          <line x1="458" y1="63" x2="476" y2="63" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+          <line x1="574" y1="63" x2="592" y2="63" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+          <line x1="690" y1="63" x2="708" y2="63" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"/>
+        </g>
+
+        <path d="M526,86 V112 H642 V86" fill="none" stroke="var(--alert)" stroke-width="1.3" stroke-dasharray="4 3"/>
+        <text x="584" y="128" text-anchor="middle" font-size="10.5" fill="var(--alert)">where the first run died</text>
+
+        <rect x="14" y="146" width="912" height="80" rx="3" fill="var(--alert-soft)" stroke="var(--alert)" stroke-width="1"/>
+        <text x="28" y="166" font-size="10.5" letter-spacing="1" fill="var(--alert)">RUN 1 · THE ERROR, AND WHAT IT MEANT</text>
+        <text x="28" y="185" font-size="11" fill="var(--ink)">Found 0 clock nets · Routed nets: 0 · Total wirelength: 0 · [ERROR RSZ-0005]</text>
+        <text x="28" y="203" font-size="10.5" fill="var(--ink-2)">config.json said CLOCK_PORT: null and CLOCK_TREE_SYNTH: false — so OpenLane faithfully built a clock tree for zero clocks,</text>
+        <text x="28" y="218" font-size="10.5" fill="var(--ink-2)">routing had no timing to route against, and the parasitics estimator had nothing to measure. DIE_AREA was 34.5 × 57.12 µm — a warehouse on a parking space.</text>
+      </svg>
+    </div>
+    <figcaption><span class="fno">Fig. 6</span>The flow, and the run-1 failure. CTS is the step that matters most and the one that was disabled: the clock must reach every flip-flop at the same instant, or a register latches stale data. An orchestra where the back row hears the conductor half a beat late falls apart. <strong>Run #7 (9 Sep 2026, <code>RUN_2026.09.09_01.14.39</code>) applied a fix and completed the flow</strong> — GDSII produced, 0 DRC violations, LVS clean, no setup/hold violations. See the box below the table.</figcaption>
+  </figure>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th class="m">config.json key</th><th class="m">Value that actually worked</th><th>Why (and how it differs from the first guess)</th></tr></thead>
+      <tbody>
+        <tr><td class="m">CLOCK_PORT</td><td class="m">"clk_i"</td><td><strong>The fix.</strong> Names the actual clock pin. Was <code>null</code>. This part of the original guess was right.</td></tr>
+        <tr><td class="m">CLOCK_PERIOD</td><td class="m">40.0</td><td>25 MHz — even more conservative than the 20 ns first guessed. Actual critical path measured 11.68 ns, so there was room to spare.</td></tr>
+        <tr><td class="m">FP_SIZING</td><td class="m">"absolute"</td><td>The original guess said <code>"relative"</code> (auto-size). What actually shipped instead was a hand-picked, generously large fixed die: <code>DIE_AREA: "0 0 650 650"</code> (650×650 µm). That's what fixed the too-small-die problem.</td></tr>
+        <tr><td class="m">PL_TARGET_DENSITY</td><td class="m">0.45</td><td>45% cells, 55% left for wiring. Guessed 0.55 originally; 0.45 is what was actually used, landing at 45.44% final utilization.</td></tr>
+        <tr><td class="m">FP_PDN_AUTO_ADJUST</td><td class="m">true</td><td>Size the power grid to the die. Matches the original guess.</td></tr>
+        <tr><td class="m">GRT_REPAIR_ANTENNAS / DIODE_ON_PORTS / RUN_HEURISTIC_DIODE_INSERTION</td><td class="m">1 / "none" / 1</td><td>The modern antenna-diode trio, used instead of the deprecated <code>DIODE_INSERTION_STRATEGY: 3</code> guessed originally. Result: 3 pin / 3 net antenna violations remained flagged but didn't block the run.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="eli5 ok"><b>Resolved — a mock IMEM was used, and it's disclosed</b>
+  <p>Earlier notes said the IMEM had to be swapped for a mock 3-instruction version before
+  synthesis, then withdrew that advice when no mock existed. As of the 9 Sep 2026 export,
+  <strong>a mock was introduced</strong>: <code>IMEM_MOCK.v</code> (3 instructions:
+  <code>addi x5,10 / addi x6,5 / add x7,x5,x6</code>, default NOP) replaces
+  <code>IMEM_FIRMWARE.v</code>, and <code>DMEM_MOCK.v</code> replaces <code>DMEM.v</code> — same
+  ports, same wiring, contents only. <strong>This is disclosed here and in report section
+  4.8/4.12</strong>, per the requirement: the OpenLane GDSII was built from the placeholder
+  program, not the 259-word official firmware. The full-firmware PASS result (<code>o_PC =
+  0x004003EC</code>, x4 = 0) is a separate simulation run against the real
+  <code>IMEM_FIRMWARE.v</code>, described in FIRMWARE_AND_SIM.md — OpenLane proves
+  manufacturability, the firmware sim proves correctness, and the report keeps them clearly
+  labeled as two different runs. One extra note: <code>DMEM_MOCK.v</code>'s comment claims
+  "2048 words = 8 kB" but it's actually a 4-word (16-byte) array (<code>DEPTH_W = 4</code>) —
+  harmless since the mock program never touches memory, but not literally 8 kB.</p></div>
+
+  <div class="prose">
+    <p><strong>One red herring.</strong> The logs show <code>designs/spm/</code>. That's
+    ChipInventor's internal staging folder — <code>spm</code> is OpenLane's bundled example design,
+    reused as a working directory. <code>DESIGN_NAME: "top"</code> is what actually determines what
+    gets built.</p>
+  </div>
+</section>
+
+<footer>
+  <p style="max-width:60ch;margin:0">This page is the visual companion. The long-form written
+  explanation — every block's ports, every wire justified, beat-by-beat instruction traces, the
+  full glossary and a one-page cheat sheet — lives alongside it in the repo.</p>
+  <div class="fl">
+    <a href="EXPLAIN_LIKE_IM_FIVE.md"><span class="fn">EXPLAIN_LIKE_IM_FIVE.md</span><span class="fd">The full narrative walkthrough, from zero</span></a>
+    <a href="ARCHITECTURE.md"><span class="fn">ARCHITECTURE.md</span><span class="fd">Exact ports and widths of every block</span></a>
+    <a href="WIRING.md"><span class="fn">WIRING.md</span><span class="fd">The complete pin-to-pin netlist</span></a>
+    <a href="VERILOG_MODULES.md"><span class="fn">VERILOG_MODULES.md</span><span class="fd">Source of the custom glue blocks</span></a>
+    <a href="STAGES_AND_BUGS.md"><span class="fn">STAGES_AND_BUGS.md</span><span class="fd">Build history, every bug, how to reproduce</span></a>
+    <a href="FIRMWARE_AND_SIM.md"><span class="fn">FIRMWARE_AND_SIM.md</span><span class="fd">Testbench and PASS/FAIL reading</span></a>
+    <a href="PLATFORM_NOTES.md"><span class="fn">PLATFORM_NOTES.md</span><span class="fd">ChipInventor quirks and OpenLane</span></a>
+  </div>
+</footer>
+
+</main>
+</div>

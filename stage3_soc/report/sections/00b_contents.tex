@@ -1,0 +1,58 @@
+% =====================================================================
+%  Page 2 -- Contents, system at a glance, Guide-topic map, figures and tables
+% =====================================================================
+\thispagestyle{first}
+\noindent{\color{river}\sffamily\bfseries\fontsize{6.9}{8}\selectfont
+  \addfontfeatures{LetterSpace=16}READING GUIDE}\par
+\vspace{2pt}
+\noindent{\color{navy}\sffamily\bfseries\fontsize{22}{26}\selectfont Contents}\par
+\vspace{2.5pt}\noindent{\color{hair}\rule{\linewidth}{0.5pt}}\par
+\vspace{1mm}
+{\RStoc}
+
+\vfill
+\noindent{\coverlabel{System at a glance}}
+\newcommand{\gk}[1]{\leavevmode{\sffamily\bfseries\color{navy}#1}}
+\noindent{\sanscond\small\renewcommand{\arraystretch}{1.2}\arrayrulecolor{navy}%
+\begin{tabularx}{\linewidth}{@{}P{21mm}L@{\hspace{6mm}}P{21mm}L@{}}
+\toprule
+\gk{Core} & RVBL-2 multicycle, RV32I + Zmmul + Xicrc, 25\,MHz &
+\gk{Firmware} & \code{main.s}: 275 instructions, 1,100\,B\\
+\gk{UART} & 115200 baud, 8-N-1, divisor 217 &
+\gk{Packets} & 6-byte SAMPLE (V, I, T); 4-byte commands; CRC-16-CCITT\\
+\gk{GPIO} & 8 pins: P7–P4 outputs, P0 reset input, P1–P3 unused &
+\gk{Thresholds} & Warm ≥ 27\,°C, Critical > 32\,°C; warning ≥ 25.6\,A, trip > 32\,A\\
+\gk{Memory map} & IMEM \hex{0x0040\_0000}, DMEM \hex{0x1001\_0000} (8\,KB) &
+\gk{Outputs} & P4 fan boost, P5 fans max, P6 current warning, P7 EPO\\
+\gk{Peripherals} & GPIO \hex{0xF000\_0000}, UART \hex{0xF100\_0000} &
+\gk{Verification} & 124 checks / 0 failures; 4 of 4 faults detected; 12 \code{./emu} runs\\
+\bottomrule
+\end{tabularx}}\par
+
+\vfill
+\noindent{\coverlabel{Where each Submission Guide requirement is answered}}
+\noindent{\sanscond\small\renewcommand{\arraystretch}{1.2}\arrayrulecolor{navy}\rowcolors{2}{white}{mist!70}%
+\begin{tabularx}{\linewidth}{@{}P{52mm}P{56mm}L@{}}
+\toprule
+\colhead{Guide topic} & \colhead{Where it is answered} & \colhead{Evidence}\\
+\midrule
+1\enspace Project Overview & \secref{sec:overview}, \figref{fig:concept} & Problem, system concept, workflow\\
+2\enspace GPIO \& UART Integration & \secref{sec:gpio}, Figures~\ref{fig:arch}–\ref{fig:closeup}, Tables~\ref{tab:regmap}–\ref{tab:designdec} & Integration design; ChipInventor block diagram (mandatory)\\
+3\enspace Official Firmware Testbench & \secref{sec:official}, \figref{fig:official} & Log and waveform of the organizer firmware on the exported design\\
+4\enspace Application Definition & \secref{sec:app}, Tables~\ref{tab:commands}–\ref{tab:emuruns} & Context, input, processing, output, \code{./emu} values\\
+5\enspace Firmware Development & \secref{sec:firmware}, \figref{fig:flow} & UART handling, CRC, Zmmul, GPIO control, latching EPO\\
+6, 7, 9\enspace Validation, video, files & \secref{sec:validation}, \tabref{tab:verif}, Figures~\ref{fig:matrix}–\ref{fig:applog}; cover & Test summary; links; binary + assembly\\
+\bottomrule
+\end{tabularx}}\par
+
+\vfill
+\noindent\begin{minipage}[t]{0.485\linewidth}
+\coverlabel{Figures}
+{\RSlof}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.485\linewidth}
+\coverlabel{Tables}
+{\RSlot}
+\end{minipage}
+\vfill
+\clearpage

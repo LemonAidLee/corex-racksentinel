@@ -1,0 +1,262 @@
+Wed Sep 09 01:14:40 +0000 2026 - Executing "{openroad -exit -no_init -python /chipinventor/OpenLane/scripts/odbpy/lefutil.py get_metal_layers -o /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/layers.list /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/techlef/sky130_fd_sc_hd__nom.tlef}"
+
+Wed Sep 09 01:14:40 +0000 2026 - Executing "{/chipinventor/OpenLane/scripts/mergeLef.py -o /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/merged.nom.lef -i /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/techlef/sky130_fd_sc_hd__nom.tlef {/root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/lef/sky130_ef_sc_hd.lef /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/lef/sky130_fd_sc_hd.lef} |& tee /dev/null}"
+
+Wed Sep 09 01:14:40 +0000 2026 - Executing "{/chipinventor/OpenLane/scripts/mergeLef.py -o /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/merged.min.lef -i /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/techlef/sky130_fd_sc_hd__min.tlef {/root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/lef/sky130_ef_sc_hd.lef /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/lef/sky130_fd_sc_hd.lef} |& tee /dev/null}"
+
+Wed Sep 09 01:14:40 +0000 2026 - Executing "{/chipinventor/OpenLane/scripts/mergeLef.py -o /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/merged.max.lef -i /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/techlef/sky130_fd_sc_hd__max.tlef {/root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/lef/sky130_ef_sc_hd.lef /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/lef/sky130_fd_sc_hd.lef} |& tee /dev/null}"
+
+Wed Sep 09 01:14:40 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/mergeLib.py --output /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/synthesis/merged.lib --name sky130A_merged /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib}"
+
+Wed Sep 09 01:14:41 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/libtrim.py --cell-file /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/synthesis/trimmed.lib.exclude.list --output /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/synthesis/trimmed.lib /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/synthesis/merged.lib}"
+
+Wed Sep 09 01:14:41 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/libtrim.py --cell-file /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/cts/cts.lib.exclude.list --output /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/cts/cts.lib /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib}"
+
+Wed Sep 09 01:14:41 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/libtrim.py --cell-file /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/cts/cts-fastest.lib.exclude.list --output /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/cts/cts-fastest.lib /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__ff_n40C_1v95.lib}"
+
+Wed Sep 09 01:14:42 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/libtrim.py --cell-file /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/cts/cts-slowest.lib.exclude.list --output /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/cts/cts-slowest.lib /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__ss_100C_1v60.lib}"
+
+Wed Sep 09 01:14:42 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/new_tracks.py -i /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/openlane/sky130_fd_sc_hd/tracks.info -o /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/routing/config.tracks}"
+
+Wed Sep 09 01:14:42 +0000 2026 - Executing "{echo {OpenLane 3876562d27af3f6825a823941b1cab36f7eb6dc3} > /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/OPENLANE_COMMIT}"
+
+Wed Sep 09 01:14:42 +0000 2026 - Executing "{yosys -c /chipinventor/OpenLane/scripts/yosys/blackbox.tcl}"
+
+Wed Sep 09 01:14:43 +0000 2026 - Executing "{verilator -Wall --lint-only --Wno-DECLFILENAME --top-module top /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/synthesis/blackbox/sky130_fd_sc_hd__blackbox.v /chipinventor/OpenLane/designs/spm/src/hdl.v -Wno-fatal --relative-includes |& tee /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/synthesis/linter.log /dev/null}"
+
+Wed Sep 09 01:14:43 +0000 2026 - Executing "{sed -E {s/^([[:space:]]+)pg_pin(.*)/\1pin\2\n\1    direction : "inout";/g} /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib > /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/synthesis/1-sky130_fd_sc_hd__tt_025C_1v80.no_pg.lib}"
+
+Wed Sep 09 01:14:43 +0000 2026 - Executing "{sed -E {s/^([[:space:]]+)pg_pin(.*)/\1pin\2\n\1    direction : "inout";/g} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/synthesis/trimmed.lib > /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/synthesis/1-trimmed.no_pg.lib}"
+
+Wed Sep 09 01:14:43 +0000 2026 - Executing "yosys -c /chipinventor/OpenLane/scripts/yosys/synth.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/synthesis/1-synthesis.log"
+
+Wed Sep 09 01:14:43 +0000 2026 - Executing "{yosys -c /chipinventor/OpenLane/scripts/yosys/synth.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/synthesis/1-synthesis.log}"
+
+Wed Sep 09 01:16:24 +0000 2026 - Executing "{sed -i.bak -e {s/\(set ::env(CURRENT_NETLIST)\).*/\1 \/chipinventor\/OpenLane\/designs\/spm\/runs\/RUN_2026.09.09_01.14.39\/results\/synthesis\/top.v/} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/config.tcl}"
+
+Wed Sep 09 01:16:24 +0000 2026 - Executing "{sed -i.bak /defparam/d /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/results/synthesis/top.v}"
+
+Wed Sep 09 01:16:24 +0000 2026 - Executing "sta -exit -no_init /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/synthesis/2-sta.log"
+
+Wed Sep 09 01:16:24 +0000 2026 - Executing "{sta -exit -no_init /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/synthesis/2-sta.log}"
+
+Wed Sep 09 01:16:32 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/floorplan.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/floorplan/3-initial_fp.log"
+
+Wed Sep 09 01:16:32 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/floorplan.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/floorplan/3-initial_fp.log}"
+
+Wed Sep 09 01:16:33 +0000 2026 - Executing "{openroad -exit -no_init -python /chipinventor/OpenLane/scripts/odbpy/defutil.py extract_core_dims --output-data /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/dimensions.txt --input-lef /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/merged.nom.lef /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/floorplan/3-initial_fp.def}"
+
+Wed Sep 09 01:16:34 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/ioplacer.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/floorplan/4-io.log"
+
+Wed Sep 09 01:16:34 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/ioplacer.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/floorplan/4-io.log}"
+
+Wed Sep 09 01:16:36 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/tapcell.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/floorplan/5-tap.log"
+
+Wed Sep 09 01:16:36 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/tapcell.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/floorplan/5-tap.log}"
+
+Wed Sep 09 01:16:37 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/pdn.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/floorplan/6-pdn.log"
+
+Wed Sep 09 01:16:37 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/pdn.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/floorplan/6-pdn.log}"
+
+Wed Sep 09 01:16:39 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/gpl.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/6-global_skip_io.log"
+
+Wed Sep 09 01:16:39 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/gpl.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/6-global_skip_io.log}"
+
+Wed Sep 09 01:16:45 +0000 2026 - Executing "{sed -i.bak -e {s/\(set ::env(CURRENT_NETLIST)\).*/\1 \/chipinventor\/OpenLane\/designs\/spm\/runs\/RUN_2026.09.09_01.14.39\/tmp\/placement\/7-global_skip_io.nl.v/} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/config.tcl}"
+
+Wed Sep 09 01:16:45 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/8-gpl_sta.log"
+
+Wed Sep 09 01:16:45 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/8-gpl_sta.log}"
+
+Wed Sep 09 01:16:55 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/ioplacer.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/9-io.log"
+
+Wed Sep 09 01:16:55 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/ioplacer.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/9-io.log}"
+
+Wed Sep 09 01:16:57 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/gpl.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/9-global.log"
+
+Wed Sep 09 01:16:57 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/gpl.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/9-global.log}"
+
+Wed Sep 09 01:17:03 +0000 2026 - Executing "{sed -i.bak -e {s/\(set ::env(CURRENT_NETLIST)\).*/\1 \/chipinventor\/OpenLane\/designs\/spm\/runs\/RUN_2026.09.09_01.14.39\/tmp\/placement\/10-global.nl.v/} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/config.tcl}"
+
+Wed Sep 09 01:17:03 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/11-gpl_sta.log"
+
+Wed Sep 09 01:17:03 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/11-gpl_sta.log}"
+
+Wed Sep 09 01:17:13 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/resizer.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/12-resizer.log"
+
+Wed Sep 09 01:17:13 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/resizer.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/12-resizer.log}"
+
+Wed Sep 09 01:17:29 +0000 2026 - Executing "{sed -i.bak -e {s/\(set ::env(CURRENT_NETLIST)\).*/\1 \/chipinventor\/OpenLane\/designs\/spm\/runs\/RUN_2026.09.09_01.14.39\/tmp\/placement\/12-resizer.nl.v/} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/config.tcl}"
+
+Wed Sep 09 01:17:29 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/dpl.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/13-detailed.log"
+
+Wed Sep 09 01:17:29 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/dpl.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/13-detailed.log}"
+
+Wed Sep 09 01:17:32 +0000 2026 - Executing "{sed -i.bak -e {s/\(set ::env(CURRENT_NETLIST)\).*/\1 \/chipinventor\/OpenLane\/designs\/spm\/runs\/RUN_2026.09.09_01.14.39\/results\/placement\/top.nl.v/} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/config.tcl}"
+
+Wed Sep 09 01:17:32 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/14-dpl_sta.log"
+
+Wed Sep 09 01:17:32 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/placement/14-dpl_sta.log}"
+
+Wed Sep 09 01:17:43 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/cts.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/cts/15-cts.log"
+
+Wed Sep 09 01:17:43 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/cts.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/cts/15-cts.log}"
+
+Wed Sep 09 01:18:04 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/cts/16-cts_sta.log"
+
+Wed Sep 09 01:18:04 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/cts/16-cts_sta.log}"
+
+Wed Sep 09 01:18:18 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/resizer_timing.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/cts/17-resizer.log"
+
+Wed Sep 09 01:18:18 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/resizer_timing.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/cts/17-resizer.log}"
+
+Wed Sep 09 01:52:55 +0000 2026 - Executing "{sed -i.bak -e {s/\(set ::env(CURRENT_NETLIST)\).*/\1 \/chipinventor\/OpenLane\/designs\/spm\/runs\/RUN_2026.09.09_01.14.39\/tmp\/cts\/17-top.resized.nl.v/} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/config.tcl}"
+
+Wed Sep 09 01:52:55 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/resizer_routing_design.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/18-resizer_design.log"
+
+Wed Sep 09 01:52:55 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/resizer_routing_design.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/18-resizer_design.log}"
+
+Wed Sep 09 01:53:13 +0000 2026 - Executing "{sed -i.bak -e {s/\(set ::env(CURRENT_NETLIST)\).*/\1 \/chipinventor\/OpenLane\/designs\/spm\/runs\/RUN_2026.09.09_01.14.39\/tmp\/18-top.nl.v/} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/config.tcl}"
+
+Wed Sep 09 01:53:13 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/19-rsz_design_sta.log"
+
+Wed Sep 09 01:53:13 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/19-rsz_design_sta.log}"
+
+Wed Sep 09 01:53:30 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/resizer_routing_timing.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/20-resizer_timing.log"
+
+Wed Sep 09 01:53:30 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/resizer_routing_timing.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/20-resizer_timing.log}"
+
+Wed Sep 09 01:53:46 +0000 2026 - Executing "{sed -i.bak -e {s/\(set ::env(CURRENT_NETLIST)\).*/\1 \/chipinventor\/OpenLane\/designs\/spm\/runs\/RUN_2026.09.09_01.14.39\/tmp\/20-top.nl.v/} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/config.tcl}"
+
+Wed Sep 09 01:53:47 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/21-rsz_timing_sta.log"
+
+Wed Sep 09 01:53:47 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/21-rsz_timing_sta.log}"
+
+Wed Sep 09 01:54:04 +0000 2026 - Executing "{openroad -exit -no_init -python /chipinventor/OpenLane/scripts/odbpy/diodes.py place --diode-cell sky130_fd_sc_hd__diode_2 --diode-pin DIODE --threshold 90 --side-strategy source --port-protect none --input-lef /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/merged.nom.lef --output-def /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/routing/22-diodes.def --output /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/routing/22-diodes.odb /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/20-top.odb |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/22-diodes.log}"
+
+Wed Sep 09 01:54:06 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/dpl.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/23-diode_legalization.log"
+
+Wed Sep 09 01:54:06 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/dpl.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/23-diode_legalization.log}"
+
+Wed Sep 09 01:54:09 +0000 2026 - Executing "{sed -i.bak -e {s/\(set ::env(CURRENT_NETLIST)\).*/\1 \/chipinventor\/OpenLane\/designs\/spm\/runs\/RUN_2026.09.09_01.14.39\/tmp\/routing\/.\/22-diodes_legalized.nl.v/} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/config.tcl}"
+
+Wed Sep 09 01:54:10 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/repair_antennas.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/24-global.log"
+
+Wed Sep 09 01:54:10 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/repair_antennas.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/24-global.log}"
+
+Wed Sep 09 01:54:21 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/write_views.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/24-global_write_netlist.log"
+
+Wed Sep 09 01:54:21 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/write_views.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/24-global_write_netlist.log}"
+
+Wed Sep 09 01:54:23 +0000 2026 - Executing "{sed -i.bak -e {s/\(set ::env(CURRENT_NETLIST)\).*/\1 \/chipinventor\/OpenLane\/designs\/spm\/runs\/RUN_2026.09.09_01.14.39\/tmp\/routing\/global.nl.v/} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/config.tcl}"
+
+Wed Sep 09 01:54:23 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/26-grt_sta.log"
+
+Wed Sep 09 01:54:23 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/26-grt_sta.log}"
+
+Wed Sep 09 01:54:39 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/fill.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/27-fill.log"
+
+Wed Sep 09 01:54:39 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/fill.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/27-fill.log}"
+
+Wed Sep 09 01:54:42 +0000 2026 - Executing "{sed -i.bak -e {s/\(set ::env(CURRENT_NETLIST)\).*/\1 \/chipinventor\/OpenLane\/designs\/spm\/runs\/RUN_2026.09.09_01.14.39\/tmp\/routing\/27-fill.nl.v/} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/config.tcl}"
+
+Wed Sep 09 01:54:42 +0000 2026 - Executing "openroad -exit -metrics /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/routing/28-drt_metrics.json /chipinventor/OpenLane/scripts/openroad/droute.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/28-detailed.log"
+
+Wed Sep 09 01:54:42 +0000 2026 - Executing "{openroad -exit -metrics /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/routing/28-drt_metrics.json /chipinventor/OpenLane/scripts/openroad/droute.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/28-detailed.log}"
+
+Wed Sep 09 02:44:34 +0000 2026 - Executing "{sed -i.bak -e {s/\(set ::env(CURRENT_NETLIST)\).*/\1 \/chipinventor\/OpenLane\/designs\/spm\/runs\/RUN_2026.09.09_01.14.39\/results\/routing\/top.nl.v/} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/config.tcl}"
+
+Wed Sep 09 02:44:34 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/drc_rosetta.py tr to_klayout -o /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/routing/drt.klayout.xml --design-name top /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/routing/drt.drc}"
+
+Wed Sep 09 02:44:34 +0000 2026 - Executing "{openroad -exit -no_init -python /chipinventor/OpenLane/scripts/odbpy/wire_lengths.py --report-out /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/routing/29-wire_lengths.csv --input-lef /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/merged.nom.lef --output-def /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/results/routing/top.def --output /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/results/routing/top.odb /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/results/routing/top.odb |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/routing/29-wire_lengths.log}"
+
+Wed Sep 09 02:44:38 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/rcx.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/30-parasitics_extraction.min.log"
+
+Wed Sep 09 02:44:38 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/rcx.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/30-parasitics_extraction.min.log}"
+
+Wed Sep 09 02:44:52 +0000 2026 - Executing "sta -exit -no_init /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/31-rcx_mcsta.min.log"
+
+Wed Sep 09 02:44:52 +0000 2026 - Executing "{sta -exit -no_init /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/31-rcx_mcsta.min.log}"
+
+Wed Sep 09 02:46:18 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/rcx.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/32-parasitics_extraction.max.log"
+
+Wed Sep 09 02:46:18 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/rcx.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/32-parasitics_extraction.max.log}"
+
+Wed Sep 09 02:46:32 +0000 2026 - Executing "sta -exit -no_init /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/33-rcx_mcsta.max.log"
+
+Wed Sep 09 02:46:32 +0000 2026 - Executing "{sta -exit -no_init /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/33-rcx_mcsta.max.log}"
+
+Wed Sep 09 02:47:57 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/rcx.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/34-parasitics_extraction.nom.log"
+
+Wed Sep 09 02:47:57 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/rcx.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/34-parasitics_extraction.nom.log}"
+
+Wed Sep 09 02:48:10 +0000 2026 - Executing "sta -exit -no_init /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/35-rcx_mcsta.nom.log"
+
+Wed Sep 09 02:48:10 +0000 2026 - Executing "{sta -exit -no_init /chipinventor/OpenLane/scripts/openroad/sta/multi_corner.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/35-rcx_mcsta.nom.log}"
+
+Wed Sep 09 02:49:47 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/irdrop.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/36-irdrop.log"
+
+Wed Sep 09 02:49:47 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/irdrop.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/36-irdrop.log}"
+
+Wed Sep 09 02:50:07 +0000 2026 - Executing "magic -noconsole -dnull -rcfile /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/magic/sky130A.magicrc < /chipinventor/OpenLane/scripts/magic/wrapper.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/37-gdsii.log"
+
+Wed Sep 09 02:50:07 +0000 2026 - Executing "{magic -noconsole -dnull -rcfile /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/magic/sky130A.magicrc < /chipinventor/OpenLane/scripts/magic/wrapper.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/37-gdsii.log}"
+
+Wed Sep 09 02:50:29 +0000 2026 - Executing "magic -noconsole -dnull -rcfile /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/magic/sky130A.magicrc < /chipinventor/OpenLane/scripts/magic/wrapper.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/37-gds_ptrs.log"
+
+Wed Sep 09 02:50:29 +0000 2026 - Executing "{magic -noconsole -dnull -rcfile /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/magic/sky130A.magicrc < /chipinventor/OpenLane/scripts/magic/wrapper.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/37-gds_ptrs.log}"
+
+Wed Sep 09 02:50:45 +0000 2026 - Executing "{sed -i.bak -n {/^<< properties >>/,/^<< end >>/p} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/signoff/gds_ptrs.mag}"
+
+Wed Sep 09 02:50:45 +0000 2026 - Executing "magic -noconsole -dnull -rcfile /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/magic/sky130A.magicrc < /chipinventor/OpenLane/scripts/magic/wrapper.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/37-lef.log"
+
+Wed Sep 09 02:50:46 +0000 2026 - Executing "{magic -noconsole -dnull -rcfile /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/magic/sky130A.magicrc < /chipinventor/OpenLane/scripts/magic/wrapper.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/37-lef.log}"
+
+Wed Sep 09 02:51:12 +0000 2026 - Executing "magic -noconsole -dnull -rcfile /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/magic/sky130A.magicrc < /chipinventor/OpenLane/scripts/magic/wrapper.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/37-maglef.log"
+
+Wed Sep 09 02:51:12 +0000 2026 - Executing "{magic -noconsole -dnull -rcfile /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/magic/sky130A.magicrc < /chipinventor/OpenLane/scripts/magic/wrapper.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/37-maglef.log}"
+
+Wed Sep 09 02:51:13 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/klayout/stream_out.py --output /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/results/signoff/top.klayout.gds --lyt /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/klayout/tech/sky130A.lyt --lym /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/klayout/tech/sky130A.map --lyp /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/klayout/tech/sky130A.lyp --top top --with-gds-file /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.ref/sky130_fd_sc_hd/gds/sky130_fd_sc_hd.gds --input-lef /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/merged.nom.lef /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/results/routing/top.def |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/38-gdsii-klayout.log}"
+
+Wed Sep 09 02:51:18 +0000 2026 - Executing "{klayout -b -r /chipinventor/OpenLane/scripts/klayout/xor.drc -rd a=/chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/results/signoff/top.gds -rd b=/chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/results/signoff/top.klayout.gds -rd jobs=1 -rd rdb_out=/chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/39-xor.xml -rd ignore=81/14 -rd rpt_out=/chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/39-xor.rpt |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/39-xor.log}"
+
+Wed Sep 09 02:52:24 +0000 2026 - Executing "magic -noconsole -dnull -rcfile /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/magic/sky130A.magicrc < /chipinventor/OpenLane/scripts/magic/wrapper.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/40-spice.log"
+
+Wed Sep 09 02:52:24 +0000 2026 - Executing "{magic -noconsole -dnull -rcfile /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/magic/sky130A.magicrc < /chipinventor/OpenLane/scripts/magic/wrapper.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/40-spice.log}"
+
+Wed Sep 09 02:53:19 +0000 2026 - Executing "{openroad -exit -no_init -python /chipinventor/OpenLane/scripts/odbpy/power_utils.py write_powered_def --output /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/signoff/40-top.p.def --input-lef /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/merged.nom.lef --power-port VPWR --ground-port VGND --powered-netlist {} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/results/routing/top.def |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/41-write_powered_def.log}"
+
+Wed Sep 09 02:53:24 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/write_views.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/41-write_powered_verilog.log"
+
+Wed Sep 09 02:53:24 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/write_views.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/41-write_powered_verilog.log}"
+
+Wed Sep 09 02:53:29 +0000 2026 - Executing "{sed -i.bak -e {s/\(set ::env(CURRENT_NETLIST)\).*/\1 \/chipinventor\/OpenLane\/designs\/spm\/runs\/RUN_2026.09.09_01.14.39\/tmp\/signoff\/40-top.nl.v/} /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/config.tcl}"
+
+Wed Sep 09 02:53:30 +0000 2026 - Executing "{netgen -batch source /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/tmp/signoff/43-setup_file.lef.lvs |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/43-lvs.lef.log}"
+
+Wed Sep 09 02:53:44 +0000 2026 - Executing "magic -noconsole -dnull -rcfile /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/magic/sky130A.magicrc < /chipinventor/OpenLane/scripts/magic/wrapper.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/44-drc.log"
+
+Wed Sep 09 02:53:44 +0000 2026 - Executing "{magic -noconsole -dnull -rcfile /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/magic/sky130A.magicrc < /chipinventor/OpenLane/scripts/magic/wrapper.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/44-drc.log}"
+
+Wed Sep 09 02:58:33 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/drc_rosetta.py magic to_tcl -o /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/drc.tcl /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/drc.rpt}"
+
+Wed Sep 09 02:58:33 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/drc_rosetta.py magic to_tr -o /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/drc.tr /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/drc.rpt}"
+
+Wed Sep 09 02:58:33 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/drc_rosetta.py tr to_klayout -o /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/drc.klayout.xml --design-name top /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/drc.tr}"
+
+Wed Sep 09 02:58:34 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/drc_rosetta.py magic to_rdb -o /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/drc.rdb /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/drc.rpt}"
+
+Wed Sep 09 02:58:34 +0000 2026 - Executing "{klayout -b -zz -r /root/.volare/volare/sky130/versions/bdc9412b3e468c102d01b7cf6337be06ec6e9c9a/sky130A/libs.tech/klayout/drc/sky130A_mr.drc -rd topcell=top -rd input=/chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/results/signoff/top.gds -rd report=/chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/violations.xml -rd feol=true -rd beol=true -rd floating_metal=false -rd seal=true -rd thread=1 |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/45-drc-klayout.log}"
+
+Wed Sep 09 03:03:46 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/klayout/xml_drc_report_to_json.py --xml-file /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/violations.xml --json-file /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/violations.json}"
+
+Wed Sep 09 03:03:47 +0000 2026 - Executing "openroad -exit /chipinventor/OpenLane/scripts/openroad/antenna_check.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/46-arc.log"
+
+Wed Sep 09 03:03:47 +0000 2026 - Executing "{openroad -exit /chipinventor/OpenLane/scripts/openroad/antenna_check.tcl |& tee /dev/null /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/46-arc.log}"
+
+Wed Sep 09 03:03:57 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/extract_antenna_violators.py --output /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/46-antenna_violators.rpt --plain-out /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/signoff/46-antenna_violators_pins.txt /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/logs/signoff/46-arc.log}"
+
+Wed Sep 09 03:03:58 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/write_runtime.py --conclude --seconds --time-in 1788923038 {flow completed}}"
+
+Wed Sep 09 03:03:59 +0000 2026 - Executing "{python3 /chipinventor/OpenLane/scripts/generate_reports.py -d /chipinventor/OpenLane/designs/spm --design_name top --tag RUN_2026.09.09_01.14.39 --output_file /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/metrics.csv --man_report /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39/reports/manufacturability.rpt --run_path /chipinventor/OpenLane/designs/spm/runs/RUN_2026.09.09_01.14.39}"
+

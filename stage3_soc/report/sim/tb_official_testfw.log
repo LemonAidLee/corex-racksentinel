@@ -1,0 +1,9 @@
+VCD info: dumpfile testfw.vcd opened for output.
+Official GPIO + UART test firmware  (./emu -d 0xF0 -i 0x0A -o 0xA0 -t1 0x30 -r1 0x30)
+[PASS] GPIO: P3-P0 = 0xa, P7-P4 = 0xa
+[PASS] UART: RX = 0x30, TX = 0x30
+[PASS] GPIO: P7-P4 holds 0xA while the firmware waits for UART (new P3-P0 = 0x5 not yet read)
+[PASS] UART: RX = 0x55, TX = 0x55
+[PASS] GPIO: P3-P0 = 0x5, P7-P4 = 0x5 after the echo
+[PASS] GPIO and UART firmware test completed successfully
+tb_official_testfw.v:99: $finish called at 415280000 (1ps)
