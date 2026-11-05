@@ -114,6 +114,10 @@ Details and how each number is reproduced: **[docs/11](docs/11-verification.md)*
 
 [`racksentinel-twin/`](racksentinel-twin/) is an interactive browser twin of RackSentinel v2, built with Next.js, TypeScript and Vitest. It opens into a pixel-art operator room: an operator at a DCIM terminal, a row of server racks, a floor leak sensor and a physical P0 reset button. Only Rack 01 is controlled by RackSentinel.
 
+![RackSentinel digital twin: the operator room](docs/images/twin-operator-room.png)
+
+*The twin's main page: operator at the DCIM terminal, Rack 01 with its P0 reset button, scenario rail and live readings. Simulation only.*
+
 | Route | What it shows |
 |---|---|
 | `/` | The operator room, 13 deterministic scenarios (9 match the FPGA runs R1 to R9 one to one), a guided demo and the DCIM terminal for sending real packets |
