@@ -4,7 +4,14 @@ A data-centre rack protection controller running on **RVBL-2**, a RISC-V process
 
 *Equipe 31 · Team CoreX · ChampionCHIP eXperience Malaysia 2026. A group project; this repository consolidates the team's Stage 2 to Stage 4 deliverables, a browser digital twin and a plain-language guide.*
 
-<!-- Your role: edit the line above or add a "My contribution" section here. -->
+## My contribution
+
+I worked on **design validation** and built the **digital twin**.
+
+- **Design validation:** I helped check the design against its requirements, including the firmware regression tests (524 checks) and the mutation testing that planted 23 firmware bugs to confirm the tests would catch them.
+- **Digital twin:** I built `racksentinel-twin/`, a browser simulation of RackSentinel v2 in Next.js, TypeScript and Vitest. Its unit tests replay all 9 FPGA runs and 1,000 cases replayed on the RTL, so a single wrong byte fails the build.
+
+The CPU, SoC and firmware were designed by the team.
 
 ![RVBL-2 SoC block diagram](docs/attachments/Full_Block_Diagram.png)
 
